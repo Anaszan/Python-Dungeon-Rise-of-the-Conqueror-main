@@ -1,5 +1,7 @@
 import { Component, Suspense, useMemo, type ReactNode } from 'react'
-import { useGLTF } from '@react-three/drei'
+import { useGLTF, useTexture } from '@react-three/drei'
+import { useLoader } from '@react-three/fiber'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import * as THREE from 'three'
 import type { CharacterClass, CharacterGender } from './characterOptions'
@@ -22,35 +24,78 @@ export type CharacterAppearance = {
 const MODEL_HEIGHT = 1.3
 const MODEL_FEET_Y = -0.65
 
-// Every class model comes from one CC0 pack ("Ultimate Modular Women Pack"
-// by Quaternius, CC0 1.0, see public/models/female/License.txt): rigged .glb
-// meshes with flat-colored materials and no texture pages. Both genders wear
-// these outfits — the male characters are the same meshes on a heavier frame
-// with every bare surface covered, see MALE_BUILD.
+// Each gender has its own sculpted model per class, both from the same CC0
+// artist so the two read as one art style:
 //
-// Only three meshes cover four classes: the witch dresses both caster
-// classes, recolored white/gold for the cleric so the two never look like the
-// same character. `weapon` fills in what the outfit doesn't ship — only the
-// hooded adventurer comes with a blade in hand.
-type ClassAsset = {
+//   male   -> "LowPoly RPG Characters" by Quaternius (public/models/<class>),
+//             one textured .obj per class, weapon modelled in.
+//   female -> "Ultimate Modular Women Pack" by Quaternius
+//             (public/models/female), rigged .glb with flat-colored
+//             materials and no texture pages.
+//
+// Both are CC0 1.0; see the License.txt next to each set.
+
+// Male assets. weaponMatch/skinMatch are substrings of each mesh's name
+// (OBJLoader sets Mesh.name from the .obj's `o` lines) used to decide which
+// texture page a mesh takes and whether it is the bare face that follows
+// the player's chosen skin color.
+type MaleAsset = {
+  obj: string
+  bodyTex: string
+  weaponTex: string
+  weaponMatch: string
+  skinMatch: string
+}
+
+const MALE_ASSETS: Record<CharacterClass, MaleAsset> = {
+  warrior: {
+    obj: '/models/warrior/Warrior.obj',
+    bodyTex: '/models/warrior/Warrior_Texture.png',
+    weaponTex: '/models/warrior/Warrior_Sword_Texture.png',
+    weaponMatch: 'Sword',
+    skinMatch: 'Face',
+  },
+  cleric: {
+    obj: '/models/cleric/Cleric.obj',
+    bodyTex: '/models/cleric/Cleric_Texture.png',
+    weaponTex: '/models/cleric/Cleric_Staff_Texture.png',
+    weaponMatch: 'Staff',
+    skinMatch: 'Head',
+  },
+  wizard: {
+    obj: '/models/wizard/Wizard.obj',
+    bodyTex: '/models/wizard/Wizard_Texture.png',
+    weaponTex: '/models/wizard/Wizard_Staff_Texture.png',
+    weaponMatch: 'Staff',
+    skinMatch: 'Face',
+  },
+  rogue: {
+    obj: '/models/rogue/Rogue.obj',
+    bodyTex: '/models/rogue/Rogue_Texture.png',
+    weaponTex: '/models/rogue/Rogue_Dagger_Texture.png',
+    weaponMatch: 'Dagger',
+    skinMatch: 'Face',
+  },
+}
+
+// Female assets. Only three meshes cover four classes: the witch dresses
+// both caster classes, recolored white/gold for the cleric so the two never
+// look like the same character. `weapon` fills in what the outfit doesn't
+// ship — only the hooded adventurer comes with a blade in hand.
+type FemaleAsset = {
   glb: string
   // Material name (from the .glb) -> replacement color. 'Skin' is handled
   // separately since it follows the player's chosen skin color.
   recolor?: Record<string, string>
-  // Material carrying the outfit's main color, used to paint over the skin
-  // on the male build (see outfitColor). Picked per asset as the largest
-  // non-skin material on its body mesh.
-  outfitMaterial: string
   weapon?: 'dagger' | 'staff'
   staffOrbColor?: string
 }
 
-const CLASS_ASSETS: Record<CharacterClass, ClassAsset> = {
-  warrior: { glb: '/models/female/HoodedAdventurer.glb', outfitMaterial: 'DarkBrown' },
-  rogue: { glb: '/models/female/Adventurer.glb', outfitMaterial: 'LightGreen', weapon: 'dagger' },
+const FEMALE_ASSETS: Record<CharacterClass, FemaleAsset> = {
+  warrior: { glb: '/models/female/HoodedAdventurer.glb' },
+  rogue: { glb: '/models/female/Adventurer.glb', weapon: 'dagger' },
   wizard: {
     glb: '/models/female/Witch.glb',
-    outfitMaterial: 'Purple',
     weapon: 'staff',
     staffOrbColor: '#8be3ff',
   },
@@ -63,7 +108,6 @@ const CLASS_ASSETS: Record<CharacterClass, ClassAsset> = {
       Hair_Black: '#7a5230',
       Brown: '#4a3b2a',
     },
-    outfitMaterial: 'Purple',
     weapon: 'staff',
     staffOrbColor: '#ffd98a',
   },
@@ -82,61 +126,8 @@ const GRIP_BONE = 'Middle1R'
 const GRIP_POSITION: [number, number, number] = [-0.0000042, 0.0009108, -0.0002511]
 const GRIP_QUATERNION: [number, number, number, number] = [0.0006481, 0, -0.7120197, 0.7021592]
 
-// How the male characters differ from the women the pack was modelled as:
-// taller, broader and thicker-necked, wearing the outfit over everything the
-// female version leaves bare.
-//
-// Only bone *translations* are edited. Moving a joint drags the skinned mesh
-// with it, which is what reshapes the silhouette; a non-uniform bone scale
-// would instead shear its way down the rotated arm bones and stretch the
-// arms. Everything else is a plain scale of the whole fitted model, which
-// can't skew anything.
-const MALE_BUILD = {
-  height: 1.08, // relative to MODEL_HEIGHT, which the women keep
-  width: 1.16, // broader head-on...
-  depth: 1.12, // ...and side-on
-  shoulderSpread: 1.8, // multiplies the shoulders' sideways offset from the chest
-  neckLength: 0.7, // head sits lower, so the neck reads short and thick
-}
-
-// The rig names these `Shoulder.L` / `Shoulder.R` / `Neck`; GLTFLoader strips
-// the dots, same as GRIP_BONE above.
-const SHOULDER_BONES = ['ShoulderL', 'ShoulderR']
-const NECK_BONE = 'Neck'
-
-function applyMaleBuild(root: THREE.Object3D) {
-  for (const name of SHOULDER_BONES) {
-    // Both shoulders hang off the chest at ±x, so scaling that offset pushes
-    // the pair of them — and the arms below them — straight outwards.
-    const shoulder = root.getObjectByName(name)
-    if (shoulder) shoulder.position.x *= MALE_BUILD.shoulderSpread
-  }
-  const neck = root.getObjectByName(NECK_BONE)
-  if (neck) neck.position.y *= MALE_BUILD.neckLength
-}
-
-// The color the male build paints over every skin-colored surface, so he
-// reads as covered head to toe in his own kit rather than as a recolored
-// woman. Read off the loaded material instead of hard-coded, so a class
-// wearing a recolored outfit (the cleric's cream/gold witch robe) matches
-// what it is actually wearing.
-function outfitColor(root: THREE.Object3D, asset: ClassAsset): THREE.Color {
-  const override = asset.recolor?.[asset.outfitMaterial]
-  if (override) return new THREE.Color(override)
-
-  // Collected into an array because TypeScript can't see through the
-  // traverse callback that a plain `let` was ever assigned.
-  const found: THREE.Color[] = []
-  root.traverse((child) => {
-    if (!(child instanceof THREE.Mesh)) return
-    const material = child.material as THREE.MeshStandardMaterial
-    if (material.name === asset.outfitMaterial) found.push(material.color)
-  })
-  return found[0] ?? new THREE.Color(ROBE_COLOR)
-}
-
 // Kept for the procedural fallback only: if a real model fails to load there
-// is no .glb mesh left to reshape, so that placeholder is reshaped instead.
+// is no mesh left to swap, so that placeholder is reshaped instead.
 const GENDER_PROPORTIONS: Record<CharacterGender, { width: number; height: number }> = {
   male: { width: 1.1, height: 1.05 },
   female: { width: 0.9, height: 0.95 },
@@ -161,13 +152,9 @@ function Ponytail({ position }: { position: [number, number, number] }) {
 }
 
 // Guaranteed fallback if a class's real model fails to load: a plain
-// low-poly humanoid with just the head/hands tinted (by skinColor, or by the
-// robe color on the male build).
+// low-poly humanoid with just the head/hands tinted by skinColor.
 function ProceduralCharacterModel({ skinColor, gender }: { skinColor: string; gender: CharacterGender }) {
   const { width, height } = GENDER_PROPORTIONS[gender]
-  // Same rule as the real models: the male build covers what the female one
-  // leaves bare, in the outfit's own color.
-  const bare = gender === 'male' ? ROBE_COLOR : skinColor
   return (
     <group scale={[width, height, width]} position={[0, MODEL_FEET_Y * (1 - height), 0]}>
       <mesh castShadow position={[-0.12, -0.42, 0]}>
@@ -192,14 +179,14 @@ function ProceduralCharacterModel({ skinColor, gender }: { skinColor: string; ge
           </mesh>
           <mesh castShadow position={[side * 0.32, -0.14, 0]}>
             <sphereGeometry args={[0.08, 8, 8]} />
-            <meshStandardMaterial color={bare} />
+            <meshStandardMaterial color={skinColor} />
           </mesh>
         </group>
       ))}
 
       <mesh castShadow position={[0, 0.52, 0]}>
         <sphereGeometry args={[0.2, 16, 16]} />
-        <meshStandardMaterial color={bare} />
+        <meshStandardMaterial color={skinColor} />
       </mesh>
       {gender === 'female' && <Ponytail position={[0, 0.58, -0.17]} />}
 
@@ -211,6 +198,20 @@ function ProceduralCharacterModel({ skinColor, gender }: { skinColor: string; ge
       </group>
     </group>
   )
+}
+
+// Drops a loaded model into the slot every character shares: scaled so it
+// stands MODEL_HEIGHT tall, then shifted so its feet land on MODEL_FEET_Y
+// and it is centred on the spot it stands on.
+function fitToPlayerSlot(model: THREE.Object3D) {
+  model.updateMatrixWorld(true)
+  const rawSize = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3())
+  model.scale.setScalar(rawSize.y > 0 ? MODEL_HEIGHT / rawSize.y : 1)
+
+  model.updateMatrixWorld(true)
+  const scaledBox = new THREE.Box3().setFromObject(model)
+  const center = scaledBox.getCenter(new THREE.Vector3())
+  model.position.set(-center.x, MODEL_FEET_Y - scaledBox.min.y, -center.z)
 }
 
 // Weapons for the outfits that ship empty-handed, built in normal
@@ -271,62 +272,70 @@ function attachWeapon(root: THREE.Object3D, weapon: THREE.Group, upright: boolea
   bone.add(weapon)
 }
 
-// The player's real model: the class's rigged .glb, auto-fit into
-// MODEL_HEIGHT/MODEL_FEET_Y so every class drops into the same slot, and
-// rendered in its bind pose (the pack's animations go unused) so it just
-// stands there. Both genders wear the same mesh — gender only decides the
-// build and what the skin-colored surfaces are painted with.
-function RiggedCharacterModel({ characterClass, gender, skinColor }: CharacterAppearance) {
-  const asset = CLASS_ASSETS[characterClass]
+// The male player model: the class's textured .obj. Only the head/face mesh
+// takes skinColor (a whole-model tint washed the armor/robe detail out to a
+// dark silhouette in earlier testing); the weapon and body meshes keep their
+// own painted texture untinted.
+function MaleCharacterModel({ characterClass, skinColor }: Omit<CharacterAppearance, 'gender'>) {
+  const asset = MALE_ASSETS[characterClass]
+  const obj = useLoader(OBJLoader, asset.obj)
+  const bodyTex = useTexture(asset.bodyTex)
+  const weaponTex = useTexture(asset.weaponTex)
+
+  const fitted = useMemo(() => {
+    bodyTex.colorSpace = THREE.SRGBColorSpace
+    weaponTex.colorSpace = THREE.SRGBColorSpace
+
+    // Cloned per instance because the player, the profile portrait and the
+    // combat portrait can all be on screen at once, and each canvas needs
+    // its own object graph.
+    const clone = obj.clone(true)
+    clone.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      const isWeapon = child.name.includes(asset.weaponMatch)
+      const isSkin = child.name.includes(asset.skinMatch)
+      child.material = new THREE.MeshStandardMaterial({
+        map: isWeapon ? weaponTex : bodyTex,
+        color: isSkin ? skinColor : '#ffffff',
+      })
+      child.castShadow = true
+    })
+
+    fitToPlayerSlot(clone)
+    return clone
+  }, [obj, bodyTex, weaponTex, asset, skinColor])
+
+  return <primitive object={fitted} />
+}
+
+// The female player model: the class's rigged .glb, rendered in its bind
+// pose (the pack's animations go unused) so she just stands there.
+function FemaleCharacterModel({ characterClass, skinColor }: Omit<CharacterAppearance, 'gender'>) {
+  const asset = FEMALE_ASSETS[characterClass]
   const { scene } = useGLTF(asset.glb)
 
   const fitted = useMemo(() => {
-    // Skinned meshes can't be shared between canvases (the player, the
-    // profile portrait and the combat portrait can all be on screen at
-    // once), so this clones the skeleton too rather than the scene graph
-    // alone.
+    // Skinned meshes can't be shared between canvases, so this clones the
+    // skeleton too rather than the scene graph alone.
     const clone = cloneSkinned(scene)
-    const male = gender === 'male'
-    // Read before the loop below replaces the materials it looks at.
-    const bare = male ? outfitColor(clone, asset) : new THREE.Color(skinColor)
 
     clone.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
       child.castShadow = true
       const source = child.material as THREE.MeshStandardMaterial
       const material = source.clone()
-      if (source.name === 'Skin') material.color.copy(bare)
+      if (source.name === 'Skin') material.color.set(skinColor)
       else if (asset.recolor?.[source.name]) material.color.set(asset.recolor[source.name])
-      // The pack's hair is styled long whatever the class; darkening it on
-      // the male build keeps it from reading as the mane it was modelled as.
-      else if (male && source.name.startsWith('Hair')) material.color.set(HAIR_COLOR)
       child.material = material
     })
 
-    if (male) applyMaleBuild(clone)
-
-    clone.updateMatrixWorld(true)
-    const rawBox = new THREE.Box3().setFromObject(clone)
-    const rawSize = rawBox.getSize(new THREE.Vector3())
-    // Box3 poses a SkinnedMesh before measuring it, so this already accounts
-    // for applyMaleBuild: the shortened neck comes back out of rawSize.y and
-    // the rest of him scales up to fill MODEL_HEIGHT again, which is what
-    // makes the head look sunk into the shoulders rather than the man look
-    // short.
-    const fit = rawSize.y > 0 ? MODEL_HEIGHT / rawSize.y : 1
-    if (male) clone.scale.set(fit * MALE_BUILD.width, fit * MALE_BUILD.height, fit * MALE_BUILD.depth)
-    else clone.scale.setScalar(fit)
-
-    clone.updateMatrixWorld(true)
-    const scaledBox = new THREE.Box3().setFromObject(clone)
-    const center = scaledBox.getCenter(new THREE.Vector3())
-    clone.position.set(-center.x, MODEL_FEET_Y - scaledBox.min.y, -center.z)
+    fitToPlayerSlot(clone)
 
     if (asset.weapon === 'dagger') attachWeapon(clone, buildDagger(), false)
     if (asset.weapon === 'staff') attachWeapon(clone, buildStaff(asset.staffOrbColor ?? '#8be3ff'), true)
 
     return clone
-  }, [scene, gender, skinColor, asset])
+  }, [scene, skinColor, asset])
 
   return <primitive object={fitted} />
 }
@@ -349,17 +358,13 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
 // breaking the scene.
 export function CharacterModel({ appearance }: { appearance: CharacterAppearance }) {
   const gender = appearance.gender ?? DEFAULT_GENDER
-  const fallback = (
-    <ProceduralCharacterModel skinColor={appearance.skinColor ?? SKIN_FALLBACK_COLOR} gender={gender} />
-  )
+  const skinColor = appearance.skinColor ?? SKIN_FALLBACK_COLOR
+  const Model = gender === 'male' ? MaleCharacterModel : FemaleCharacterModel
+  const fallback = <ProceduralCharacterModel skinColor={skinColor} gender={gender} />
   return (
     <ModelErrorBoundary key={`${appearance.characterClass}-${gender}`} fallback={fallback}>
       <Suspense fallback={fallback}>
-        <RiggedCharacterModel
-          characterClass={appearance.characterClass}
-          gender={gender}
-          skinColor={appearance.skinColor ?? SKIN_FALLBACK_COLOR}
-        />
+        <Model characterClass={appearance.characterClass} skinColor={skinColor} />
       </Suspense>
     </ModelErrorBoundary>
   )

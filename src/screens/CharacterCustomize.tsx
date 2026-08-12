@@ -144,28 +144,23 @@ export function CharacterCustomize() {
           </div>
         </div>
 
-        {/* Male characters wear their outfit over every surface the female
-            models leave bare (see CharacterModel), so there is no skin left
-            for this to colour — the picker only appears where it does
-            something. The chosen colour is still kept in state, so switching
-            back to หญิง restores it. */}
-        {gender === 'female' && (
-          <div className="customize-section">
-            <p>สีผิว</p>
-            <div className="swatch-row">
-              {SKIN_COLOR_OPTIONS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  className={`swatch ${skinColor === color ? 'swatch-active' : ''}`}
-                  style={{ background: color }}
-                  aria-label={color}
-                  onClick={() => setSkinColor(color)}
-                />
-              ))}
-            </div>
+        {/* Both genders now have a bare face mesh that follows this colour
+            (see CharacterModel), so the picker applies either way. */}
+        <div className="customize-section">
+          <p>สีผิว</p>
+          <div className="swatch-row">
+            {SKIN_COLOR_OPTIONS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`swatch ${skinColor === color ? 'swatch-active' : ''}`}
+                style={{ background: color }}
+                aria-label={color}
+                onClick={() => setSkinColor(color)}
+              />
+            ))}
           </div>
-        )}
+        </div>
 
         <button
           type="button"
