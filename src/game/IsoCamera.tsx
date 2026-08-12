@@ -24,7 +24,7 @@ export function IsoCamera({ target }: { target: RefObject<THREE.Vector3> }) {
     <OrthographicCamera
       ref={camRef}
       makeDefault
-      zoom={56}
+      zoom={65}
       position={[ISO_OFFSET.x, ISO_OFFSET.y, ISO_OFFSET.z]}
       near={0.1}
       far={200}
