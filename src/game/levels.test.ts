@@ -1,3 +1,10 @@
+// This is the one file under src/ that touches the filesystem — it checks the
+// art in public/ actually exists. tsconfig.app.json limits `types` to
+// vite/client so app code can't reach for node globals by accident, so pull
+// the node types in here only.
+/// <reference types="node" />
+import { readFileSync, existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { ALL_MONSTERS, LEVELS } from './levels'
 import { LESSONS } from './lessons'
@@ -10,6 +17,21 @@ import { COMBAT_TRIGGER_DISTANCE, LANTERN_RADIUS } from './constants'
 
 function distance(a: [number, number, number], b: [number, number, number]) {
   return Math.hypot(a[0] - b[0], a[2] - b[2])
+}
+
+// Art lives in public/ and is served by path, so nothing type-checks these
+// urls — resolve them off this file rather than the cwd so the check holds
+// wherever vitest is launched from.
+function publicPath(url: string) {
+  return fileURLToPath(new URL(`../../public${url}`, import.meta.url))
+}
+
+// PNG: 8-byte signature, then the IHDR chunk, whose 10th byte is the color
+// type. 4 (grey+alpha) and 6 (RGBA) are the two that carry an alpha channel.
+function pngHasAlpha(file: string) {
+  const b = readFileSync(file)
+  expect(b.subarray(12, 16).toString(), `${file} is not a PNG`).toBe('IHDR')
+  return b[25] === 4 || b[25] === 6
 }
 
 describe('campaign', () => {
@@ -33,6 +55,41 @@ describe('campaign', () => {
     // defeated flag.
     const ids = ALL_MONSTERS.map((m) => m.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('gives every monster a 2D sprite for the combat screen', () => {
+    // CombatOverlay is plain HTML: it renders monster.imageUrl in an <img>
+    // and falls back to a flat colored circle when it is missing. modelUrl
+    // does not help there — an <img> cannot show a GLB — so a monster with
+    // only a model (as all of level 4 once had) turns into a blob the moment
+    // the fight starts, even though it looks right out in the dungeon.
+    for (const monster of ALL_MONSTERS) {
+      expect(monster.imageUrl, `${monster.name} has no imageUrl`).toBeTruthy()
+    }
+  })
+
+  it('ships every art file it points at', () => {
+    // These urls are plain strings resolved by the browser at runtime, so a
+    // typo or a deleted file shows up as a missing sprite mid-fight and
+    // nowhere else.
+    for (const monster of ALL_MONSTERS) {
+      for (const url of [monster.imageUrl, monster.modelUrl]) {
+        if (!url) continue
+        expect(existsSync(publicPath(url)), `${monster.name}: missing ${url}`).toBe(true)
+      }
+    }
+  })
+
+  it('uses cut-out sprites, not opaque tiles, for its monster art', () => {
+    // Both places a sprite is drawn key it off alpha — the 3D scene discards
+    // see-through pixels (alphaTest) and the combat screen just overlays the
+    // PNG on the battle background. Art saved without an alpha channel is a
+    // solid rectangle in both, so the monster reads as a photo tile pasted
+    // onto the dungeon.
+    for (const monster of ALL_MONSTERS) {
+      if (!monster.imageUrl?.endsWith('.png')) continue
+      expect(pngHasAlpha(publicPath(monster.imageUrl)), `${monster.name}: ${monster.imageUrl} has no alpha channel`).toBe(true)
+    }
   })
 
   it('keeps pickup ids unique across every level', () => {
