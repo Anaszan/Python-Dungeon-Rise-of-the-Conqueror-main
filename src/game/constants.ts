@@ -7,7 +7,14 @@ export const FLEE_CLEAR_DISTANCE = 2.2
 export const PICKUP_TRIGGER_DISTANCE = 1.0
 
 export const PLAYER_MAX_HP = 200
-export const BASE_ATTACK_POWER = 20
+export const BASE_ATTACK_POWER = 30
+
+// Every `kind: 'attack'` pickup in every level hands out exactly this much —
+// see levels.ts. Kept as one constant rather than a per-pickup number so the
+// power curve stays flat and predictable: the player's atk is always
+// BASE_ATTACK_POWER + 10 per potion collected, no matter which level it came
+// from. The level-exam damage targets in lessons.ts are sized against that.
+export const ATTACK_PICKUP_AMOUNT = 10
 
 export const SKILL_COOLDOWN_SECONDS = 8
 export const SKILL_DAMAGE_MULTIPLIER = 3

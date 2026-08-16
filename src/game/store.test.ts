@@ -72,25 +72,48 @@ describe('useGameStore', () => {
     expect(useGameStore.getState().playerHp).toBe(PLAYER_MAX_HP)
   })
 
-  it('exitCombat advances to the next level once every monster in the current level is defeated', () => {
+  it('exitCombat opens the end-of-level exam once every monster in the current level is defeated', () => {
     const ids = defeatAllMonstersInLevel(0)
     useGameStore.setState({ currentLevel: 1, activeMonsterId: ids[ids.length - 1], playerHp: 100 })
 
     useGameStore.getState().exitCombat()
 
     const s = useGameStore.getState()
-    expect(s.currentLevel).toBe(2)
-    expect(s.phase).toBe('exploring')
+    expect(s.phase).toBe('exam')
+    expect(s.currentLevel).toBe(1) // still level 1 — the exam has not been passed yet
     expect(s.activeMonsterId).toBeNull()
   })
 
-  it('exitCombat sets phase to victory after the final level is fully cleared', () => {
+  it('passLevelExam is what actually advances the level', () => {
+    const ids = defeatAllMonstersInLevel(0)
+    useGameStore.setState({ currentLevel: 1, activeMonsterId: ids[ids.length - 1], playerHp: 100 })
+    useGameStore.getState().exitCombat()
+
+    useGameStore.getState().passLevelExam()
+
+    const s = useGameStore.getState()
+    expect(s.currentLevel).toBe(2)
+    expect(s.phase).toBe('exploring')
+  })
+
+  it('passLevelExam does nothing outside the exam phase', () => {
+    useGameStore.setState({ currentLevel: 1, phase: 'exploring' })
+
+    useGameStore.getState().passLevelExam()
+
+    expect(useGameStore.getState().currentLevel).toBe(1)
+    expect(useGameStore.getState().phase).toBe('exploring')
+  })
+
+  it('the final level reaches victory through its exam, not around it', () => {
     const lastLevelIndex = LEVELS.length - 1
     const ids = defeatAllMonstersInLevel(lastLevelIndex)
     useGameStore.setState({ currentLevel: LEVELS.length, activeMonsterId: ids[ids.length - 1], playerHp: 100 })
 
     useGameStore.getState().exitCombat()
+    expect(useGameStore.getState().phase).toBe('exam')
 
+    useGameStore.getState().passLevelExam()
     expect(useGameStore.getState().phase).toBe('victory')
   })
 
@@ -122,6 +145,24 @@ describe('useGameStore', () => {
     expect(s.gender).toBe('female')
     expect(s.skinColor).toBe('#abcdef')
     expect(s.characterName).toBe('Gandalf')
+  })
+
+  it('hydrateSave derives the exam phase from a save whose level has no monsters left', () => {
+    useGameStore.getState().hydrateSave({
+      defeatedMonsterIds: LEVELS[0].monsters.map((m) => m.id),
+      playerHp: 120,
+      attackPower: BASE_ATTACK_POWER,
+      collectedPickupIds: [],
+      currentLevel: 1,
+      skillCooldown: 0,
+      characterClass: 'wizard',
+      gender: 'male',
+      skinColor: DEFAULT_SKIN_COLOR,
+      characterName: 'Rin',
+    })
+    const s = useGameStore.getState()
+    expect(s.phase).toBe('exam')
+    expect(s.currentLevel).toBe(1)
   })
 
   it('hydrateSave derives gameover from a save persisted at 0 HP', () => {
@@ -198,10 +239,11 @@ describe('useGameStore', () => {
 })
 
 // Driving the real store through the whole campaign the way a player would:
-// walk into every monster of a level, kill it, leave the fight, and expect the
-// game to hand out the next level — and the victory screen after the last one.
-// The individual exitCombat cases above each pin one branch; this is the check
-// that all six levels really do chain together end to end.
+// walk into every monster of a level, kill it, leave the fight, sit the
+// end-of-level exam, and expect the game to hand out the next level — and the
+// victory screen after the last one. The individual exitCombat cases above
+// each pin one branch; this is the check that all six levels really do chain
+// together end to end.
 function fightAndDefeat(monster: (typeof ALL_MONSTERS)[number]) {
   const store = useGameStore.getState()
   store.enterCombat({
@@ -216,6 +258,13 @@ function fightAndDefeat(monster: (typeof ALL_MONSTERS)[number]) {
   useGameStore.getState().exitCombat()
 }
 
+// Stands in for the player actually writing and passing the level's exam in
+// LevelExamOverlay — the store side of that is just this one call.
+function sitAndPassExam(levelNumber: number) {
+  expect(useGameStore.getState().phase, `exam for level ${levelNumber}`).toBe('exam')
+  useGameStore.getState().passLevelExam()
+}
+
 describe('level completion', () => {
   beforeEach(() => {
     useGameStore.getState().resetSave()
@@ -227,6 +276,7 @@ describe('level completion', () => {
       expect(useGameStore.getState().phase, `start of level ${level.level}`).toBe('exploring')
 
       level.monsters.forEach(fightAndDefeat)
+      sitAndPassExam(level.level)
     }
 
     const s = useGameStore.getState()
@@ -235,7 +285,7 @@ describe('level completion', () => {
     expect(s.defeatedIds.size).toBe(ALL_MONSTERS.length)
   })
 
-  it.each(LEVELS)('level $level does not open the exit while one monster is still alive', (level) => {
+  it.each(LEVELS)('level $level does not open the exam while one monster is still alive', (level) => {
     useGameStore.setState({ currentLevel: level.level })
 
     // Everything but the last monster in the level.
@@ -243,9 +293,13 @@ describe('level completion', () => {
     expect(useGameStore.getState().currentLevel, 'advanced early').toBe(level.level)
     expect(useGameStore.getState().phase).toBe('exploring')
 
-    // And now the straggler, which is what should actually open it.
+    // And now the straggler, which is what should actually open the exam.
     const last = level.monsters[level.monsters.length - 1]
     fightAndDefeat(last)
+    expect(useGameStore.getState().phase, 'exam should be open now').toBe('exam')
+    expect(useGameStore.getState().currentLevel, 'level moved before the exam').toBe(level.level)
+
+    sitAndPassExam(level.level)
     const s = useGameStore.getState()
     if (level.level === LEVELS.length) expect(s.phase).toBe('victory')
     else expect(s.currentLevel).toBe(level.level + 1)

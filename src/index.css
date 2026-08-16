@@ -1721,6 +1721,156 @@ canvas {
   color: var(--gold-bright);
 }
 
+/* End-of-level exam (LevelExamOverlay). Sits at the same z-index as the
+   game-over/victory overlays because it is the same kind of thing: a
+   full-screen gate over the dungeon that nothing else can be interacted
+   with around. Its arcane blue separates it from game-over's red and
+   victory's gold at a glance. */
+.exam-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: radial-gradient(circle at 50% 20%, #1b2a4a 0%, var(--wood-dark) 70%);
+}
+
+.exam-panel {
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: calc(32px + env(safe-area-inset-top)) calc(clamp(16px, 8vw, 220px) + env(safe-area-inset-right))
+    calc(40px + env(safe-area-inset-bottom)) calc(clamp(16px, 8vw, 220px) + env(safe-area-inset-left));
+  text-align: center;
+}
+
+.exam-guardian {
+  margin: 16px auto 0;
+  max-width: 420px;
+}
+
+.exam-guardian-name {
+  margin: 0 0 6px;
+  font-family: 'Cinzel', 'Noto Sans Thai', serif;
+  font-size: 15px;
+  color: var(--gold-bright);
+}
+
+.exam-guardian-track {
+  width: 100%;
+}
+
+.exam-guardian-hp {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--parchment-dim);
+}
+
+.exam-checklist {
+  text-align: left;
+  margin: 18px 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px dashed var(--gold-dim);
+}
+
+.exam-checklist-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+}
+
+.exam-brief-line {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--parchment-text);
+}
+
+.exam-checks {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--gold-dim);
+}
+
+/* The live checklist reads as "not yet" by default and only lights up once
+   the pattern for that line is actually present in the editor, so the player
+   can see the chapter's syntax being satisfied as they type. */
+.exam-check {
+  margin: 0 0 4px;
+  font-family: ui-monospace, SFMono-Regular, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  color: var(--parchment-dim);
+}
+
+.exam-check-ok {
+  color: #7fd98f;
+}
+
+.exam-verdict {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.exam-verdict-fail {
+  color: #e8a06f;
+}
+
+.exam-verdict-pass {
+  color: #7fd98f;
+  font-weight: 700;
+}
+
+.exam-footer {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.exam-hints {
+  text-align: left;
+  margin: 12px auto 0;
+  max-width: 640px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--wood-dark);
+  border: 1px solid var(--gold-dim);
+}
+
+.exam-hints p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--parchment-dim);
+}
+
+.exam-continue-btn {
+  margin-top: 18px;
+  padding: 12px 32px;
+  border-radius: 6px;
+  border: 1px solid var(--gold-dim);
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold-dim));
+  color: var(--wood-dark);
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.exam-continue-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dim));
+}
+
+.exam-continue-btn:disabled {
+  background: #4a4030;
+  border-color: #4a4030;
+  color: #8a8270;
+  cursor: not-allowed;
+}
+
 .customize-panel {
   width: 100%;
   min-height: 100%;

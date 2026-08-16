@@ -153,11 +153,11 @@ export function CombatOverlay() {
               <p className="combat-message">
                 {levelCleared
                   ? isLastLevel
-                    ? 'ชนะเกม! คุณกอบกู้อาณาจักรโค้ดสำเร็จ 🎉'
-                    : `ด่าน ${currentLevel} ผ่านแล้ว! เตรียมตัวลุยด่านต่อไป`
+                    ? 'มอนสเตอร์ด่านสุดท้ายหมดแล้ว! เหลือแค่บทสอบปิดผนึกดันเจี้ยน'
+                    : `มอนสเตอร์ในด่าน ${currentLevel} หมดแล้ว! ประตูด่านต่อไปยังปิดผนึกอยู่ — ต้องผ่านบทสอบก่อน`
                   : `${monster.name} ถูกปราบแล้ว!`}
               </p>
-              <button onClick={exitCombat}>{levelCleared && !isLastLevel ? 'ไปด่านต่อไป' : 'Continue'}</button>
+              <button onClick={exitCombat}>{levelCleared ? 'ไปบทสอบจบด่าน' : 'Continue'}</button>
             </div>
           ) : (
             <>

@@ -18,7 +18,13 @@ export type CombatMonster = {
   attackInterval: number
 }
 
-type GamePhase = 'exploring' | 'combat' | 'gameover' | 'victory'
+// 'exam' sits between clearing a level and getting the next one: once the
+// last monster of a level is dead, leaving that fight drops the player into
+// the end-of-level exam (LevelExamOverlay) instead of straight into level
+// N+1. Nothing but passLevelExam() leaves this phase, so the exam is the only
+// door out of a finished level — including the last one, which reaches
+// 'victory' through it rather than around it.
+type GamePhase = 'exploring' | 'combat' | 'exam' | 'gameover' | 'victory'
 
 type GameState = {
   phase: GamePhase
@@ -61,6 +67,7 @@ type GameState = {
   tickCooldowns: (delta: number) => void
   setMonsterAttackCountdown: (seconds: number) => void
   exitCombat: () => void
+  passLevelExam: () => void
   clearFledMonster: () => void
   setPaused: (paused: boolean) => void
   confirmCharacter: (
@@ -220,7 +227,29 @@ export const useGameStore = create<GameState>((set, get) => ({
       defeatedIds.has(activeMonsterId) &&
       LEVELS[currentLevel - 1].monsters.every((m) => defeatedIds.has(m.id))
 
-    if (levelCleared && currentLevel < LEVELS.length) {
+    // Every monster down does not hand out the next level any more — it hands
+    // out the exam. currentLevel deliberately does not move here, so a reload
+    // mid-exam lands back on the exam (see hydrateSave) rather than skipping it.
+    if (levelCleared) {
+      set({ phase: 'exam', activeMonsterId: null, fledMonsterId: null })
+      return
+    }
+
+    set((state) => ({
+      phase: 'exploring',
+      activeMonsterId: null,
+      fledMonsterId: state.activeMonsterId,
+    }))
+  },
+
+  // The only exit from 'exam': called by LevelExamOverlay once the player's
+  // own from-scratch code has satisfied every check for the chapter and put
+  // the gate guardian down in a single cast.
+  passLevelExam: () => {
+    const { phase, currentLevel } = get()
+    if (phase !== 'exam') return
+
+    if (currentLevel < LEVELS.length) {
       set({
         phase: 'exploring',
         activeMonsterId: null,
@@ -231,16 +260,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return
     }
 
-    if (levelCleared && currentLevel === LEVELS.length) {
-      set({ phase: 'victory', activeMonsterId: null, fledMonsterId: null })
-      return
-    }
-
-    set((state) => ({
-      phase: 'exploring',
-      activeMonsterId: null,
-      fledMonsterId: state.activeMonsterId,
-    }))
+    set({ phase: 'victory', activeMonsterId: null, fledMonsterId: null })
   },
 
   clearFledMonster: () => set({ fledMonsterId: null }),
@@ -252,7 +272,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     persist()
   },
 
-  hydrateSave: (save) =>
+  hydrateSave: (save) => {
+    const defeated = new Set(save.defeatedMonsterIds)
+    // Nothing writes 'exam' to Supabase (phase isn't part of SaveData), so it
+    // has to be re-derived: a save whose current level has no monsters left
+    // is a save taken during that level's exam. Without this, reloading
+    // mid-exam would drop the player into an empty dungeon with every
+    // monster dead and no way left to reach the next level.
+    const levelCleared = LEVELS[save.currentLevel - 1]?.monsters.every((m) => defeated.has(m.id)) ?? false
+
     set({
       // A save can be persisted mid-death (damagePlayer writes playerHp: 0
       // to Supabase the instant HP hits zero, before the player ever clicks
@@ -260,8 +288,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       // would drop the player back into the level they died in — stale
       // defeatedIds, 0 HP, no game-over screen — instead of sending them
       // through the same reset restart() does.
-      phase: save.playerHp <= 0 ? 'gameover' : 'exploring',
-      defeatedIds: new Set(save.defeatedMonsterIds),
+      phase: save.playerHp <= 0 ? 'gameover' : levelCleared ? 'exam' : 'exploring',
+      defeatedIds: defeated,
       playerHp: save.playerHp,
       attackPower: save.attackPower,
       collectedPickupIds: new Set(save.collectedPickupIds),
@@ -272,7 +300,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       skinColor: save.skinColor,
       characterName: save.characterName,
       saveLoaded: true,
-    }),
+    })
+  },
 
   restart: () => {
     set({

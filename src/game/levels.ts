@@ -1,6 +1,6 @@
 import type { Region, Wall } from './dungeon'
 import { WALL_THICKNESS } from './dungeon'
-import { PLAYER_MAX_HP } from './constants'
+import { ATTACK_PICKUP_AMOUNT, PLAYER_MAX_HP } from './constants'
 import type { MonsterData } from './monsters'
 import type { PickupData } from './pickups'
 
@@ -90,10 +90,10 @@ const LEVEL_1_MONSTERS: MonsterData[] = [
 
 const LEVEL_1_PICKUPS: PickupData[] = [
   { id: 'heal-1', kind: 'heal', amount: PLAYER_MAX_HP, position: [-7, 0.5, -9] },
-  { id: 'attack-1', kind: 'attack', amount: 5, position: [6, 0.5, -22] },
+  { id: 'attack-1', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [6, 0.5, -22] },
   { id: 'heal-2', kind: 'heal', amount: PLAYER_MAX_HP, position: [0, 0.5, -25] },
-  { id: 'attack-2', kind: 'attack', amount: 8, position: [-5, 0.5, -38] },
-  { id: 'potion-1', kind: 'attack', amount: 50, position: [0, 0.5, -10] },
+  { id: 'attack-2', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [-5, 0.5, -38] },
+  { id: 'potion-1', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -10] },
 ]
 
 const LEVEL_1_DECORATIONS: DecorationData[] = [
@@ -194,10 +194,10 @@ const LEVEL_2_MONSTERS: MonsterData[] = [
 
 const LEVEL_2_PICKUPS: PickupData[] = [
   { id: 'heal-3', kind: 'heal', amount: PLAYER_MAX_HP, position: [-6, 0.5, -10] },
-  { id: 'attack-3', kind: 'attack', amount: 10, position: [6, 0.5, -27] },
+  { id: 'attack-3', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [6, 0.5, -27] },
   { id: 'heal-4', kind: 'heal', amount: PLAYER_MAX_HP, position: [-2, 0.5, -44] },
-  { id: 'attack-4', kind: 'attack', amount: 15, position: [-10, 0.5, -44] },
-  { id: 'potion-2', kind: 'attack', amount: 50, position: [0, 0.5, -12] },
+  { id: 'attack-4', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [-10, 0.5, -44] },
+  { id: 'potion-2', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -12] },
 ]
 
 const LEVEL_2_DECORATIONS: DecorationData[] = [
@@ -258,10 +258,10 @@ const LEVEL_3_MONSTERS: MonsterData[] = [
 
 const LEVEL_3_PICKUPS: PickupData[] = [
   { id: 'heal-5', kind: 'heal', amount: PLAYER_MAX_HP, position: [-7, 0.5, -9] },
-  { id: 'attack-5', kind: 'attack', amount: 12, position: [6, 0.5, -22] },
+  { id: 'attack-5', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [6, 0.5, -22] },
   { id: 'heal-6', kind: 'heal', amount: PLAYER_MAX_HP, position: [0, 0.5, -25] },
-  { id: 'attack-6', kind: 'attack', amount: 15, position: [-5, 0.5, -38] },
-  { id: 'potion-3', kind: 'attack', amount: 50, position: [0, 0.5, -10] },
+  { id: 'attack-6', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [-5, 0.5, -38] },
+  { id: 'potion-3', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -10] },
 ]
 
 export const LEVEL_3: LevelData = {
@@ -303,10 +303,10 @@ const LEVEL_4_MONSTERS: MonsterData[] = [
 
 const LEVEL_4_PICKUPS: PickupData[] = [
   { id: 'heal-7', kind: 'heal', amount: PLAYER_MAX_HP, position: [-6, 0.5, -10] },
-  { id: 'attack-7', kind: 'attack', amount: 13, position: [6, 0.5, -27] },
+  { id: 'attack-7', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [6, 0.5, -27] },
   { id: 'heal-8', kind: 'heal', amount: PLAYER_MAX_HP, position: [-2, 0.5, -44] },
-  { id: 'attack-8', kind: 'attack', amount: 16, position: [-10, 0.5, -44] },
-  { id: 'potion-4', kind: 'attack', amount: 50, position: [0, 0.5, -12] },
+  { id: 'attack-8', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [-10, 0.5, -44] },
+  { id: 'potion-4', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -12] },
 ]
 
 export const LEVEL_4: LevelData = {
@@ -341,10 +341,10 @@ const LEVEL_5_MONSTERS: MonsterData[] = [
 
 const LEVEL_5_PICKUPS: PickupData[] = [
   { id: 'heal-9', kind: 'heal', amount: PLAYER_MAX_HP, position: [-7, 0.5, -9] },
-  { id: 'attack-9', kind: 'attack', amount: 18, position: [6, 0.5, -22] },
+  { id: 'attack-9', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [6, 0.5, -22] },
   { id: 'heal-10', kind: 'heal', amount: PLAYER_MAX_HP, position: [0, 0.5, -25] },
-  { id: 'attack-10', kind: 'attack', amount: 20, position: [-5, 0.5, -38] },
-  { id: 'potion-5', kind: 'attack', amount: 50, position: [0, 0.5, -10] },
+  { id: 'attack-10', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [-5, 0.5, -38] },
+  { id: 'potion-5', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -10] },
 ]
 
 export const LEVEL_5: LevelData = {
@@ -390,10 +390,10 @@ const LEVEL_6_MONSTERS: MonsterData[] = [
 
 const LEVEL_6_PICKUPS: PickupData[] = [
   { id: 'heal-11', kind: 'heal', amount: PLAYER_MAX_HP, position: [-6, 0.5, -10] },
-  { id: 'attack-11', kind: 'attack', amount: 20, position: [6, 0.5, -27] },
+  { id: 'attack-11', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [6, 0.5, -27] },
   { id: 'heal-12', kind: 'heal', amount: PLAYER_MAX_HP, position: [-2, 0.5, -44] },
-  { id: 'attack-12', kind: 'attack', amount: 22, position: [-10, 0.5, -44] },
-  { id: 'potion-6', kind: 'attack', amount: 50, position: [0, 0.5, -12] },
+  { id: 'attack-12', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [-10, 0.5, -44] },
+  { id: 'potion-6', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -12] },
 ]
 
 export const LEVEL_6: LevelData = {

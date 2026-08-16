@@ -15,6 +15,7 @@ import { PlayerHUD } from './screens/PlayerHUD'
 import { TouchJoystick } from './game/TouchJoystick'
 import { LevelBanner } from './screens/LevelBanner'
 import { GameOverOverlay } from './screens/GameOverOverlay'
+import { LevelExamOverlay } from './screens/LevelExamOverlay'
 import { VictoryOverlay } from './screens/VictoryOverlay'
 import { PauseButton } from './screens/PauseButton'
 import { PauseMenu } from './screens/PauseMenu'
@@ -109,13 +110,19 @@ function App() {
         <TouchJoystick />
         <LevelBanner />
         <CombatOverlay />
+        {/* Mounted only while the exam is up, unlike the other overlays,
+            which self-guard on phase and stay mounted. This one warms
+            Pyodide the moment it mounts — leaving it mounted would kick off
+            that multi-MB download as soon as the player enters the dungeon,
+            long before any code box exists to use it. */}
+        {phase === 'exam' && <LevelExamOverlay />}
         <GameOverOverlay />
         <VictoryOverlay />
-        {/* Hidden for the duration of a fight: these sit in the corner the
-            battle screen gives the monster, and each opens a modal that
-            would cover the fight while the monster's attack timer keeps
-            running. */}
-        {phase !== 'combat' && (
+        {/* Hidden for the duration of a fight and of the end-of-level exam:
+            these sit in the corner the battle screen gives the monster, and
+            each opens a modal that would cover the fight while the monster's
+            attack timer keeps running. */}
+        {phase !== 'combat' && phase !== 'exam' && (
           <>
             <Leaderboard />
             <PlayerProfile />
