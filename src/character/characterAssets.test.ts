@@ -17,6 +17,8 @@ function gltfJson(url: string) {
   return JSON.parse(buffer.subarray(20, 20 + buffer.readUInt32LE(12)).toString()) as {
     materials?: { name: string }[]
     nodes?: { name: string }[]
+    animations?: { name: string }[]
+    skins?: { joints: number[] }[]
   }
 }
 
@@ -78,6 +80,35 @@ describe('character models', () => {
           asset.shirtMaterial !== undefined || (asset.shirtMeshes?.length ?? 0) > 0,
           `${where}: nothing follows the shirt color`,
         ).toBe(true)
+      }
+    }
+  })
+
+  // Every model can walk, by one of the two routes in character/gait.ts —
+  // either it ships the clips, or it has the bones the hand-posed gait swings.
+  // A model with neither would just glide along the floor in its bind pose.
+  it('can be walked, by clip or by bone', () => {
+    const POSED_BONES = ['UpperLeg.L', 'UpperLeg.R', 'LowerLeg.L', 'LowerLeg.R', 'UpperArm.L', 'UpperArm.R', 'Torso']
+
+    for (const [gender, classes] of Object.entries(CHARACTER_ASSETS)) {
+      for (const [cls, asset] of Object.entries(classes)) {
+        const { animations = [], skins = [], nodes = [] } = gltfJson(asset.glb)
+        const where = `${gender}/${cls}`
+
+        if (animations.length > 0) {
+          for (const suffix of ['|Walk', '|Idle']) {
+            expect(
+              animations.some((clip) => clip.name.endsWith(suffix)),
+              `${where}: no ${suffix} clip`,
+            ).toBe(true)
+          }
+          continue
+        }
+
+        const joints = (skins[0]?.joints ?? []).map((index) => nodes[index].name)
+        for (const bone of POSED_BONES) {
+          expect(joints, `${where}: hand-posed gait needs a ${bone} bone`).toContain(bone)
+        }
       }
     }
   })

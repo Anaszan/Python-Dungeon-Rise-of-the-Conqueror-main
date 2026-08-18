@@ -1,4 +1,7 @@
-export const PLAYER_SPEED = 6
+// Units per second on the floor. Pulled 20% down from the original 6 so the
+// dungeon reads at walking pace; GAIT_CYCLES_PER_SECOND in character/gait.ts
+// paces the walk cycle against this, so the two move together.
+export const PLAYER_SPEED = 4.8
 
 export const ISO_OFFSET = { x: 10, y: 12, z: 10 } as const
 

@@ -1,11 +1,13 @@
-import { Component, Suspense, useMemo, type ReactNode } from 'react'
+import { Component, Suspense, useMemo, useRef, type ReactNode } from 'react'
 import { useGLTF } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import * as THREE from 'three'
 import type { CharacterClass, CharacterGender } from './characterOptions'
 import { DEFAULT_GENDER } from './characterOptions'
 import { CHARACTER_ASSETS, type ClassAsset } from './characterAssets'
 import { getRecoloredShirtMap } from './shirtTexture'
+import { GAIT_CYCLES_PER_SECOND, useClipGait, useProceduralGait } from './gait'
 
 const SKIN_FALLBACK_COLOR = '#e0b48a'
 const ROBE_COLOR = '#4a4030'
@@ -73,14 +75,30 @@ function ProceduralCharacterModel({
   skinColor,
   shirtColor,
   gender,
+  moving,
 }: {
   skinColor: string
   shirtColor: string
   gender: CharacterGender
+  moving: boolean
 }) {
   const { width, height } = GENDER_PROPORTIONS[gender]
+  const baseY = MODEL_FEET_Y * (1 - height)
+  // It has no skeleton to pose, so its walk is the whole body rocking — the
+  // stand-in gait the real models used before they were animated.
+  const body = useRef<THREE.Group>(null)
+  const phase = useRef(0)
+  const swing = useRef(0)
+  useFrame((_, delta) => {
+    if (!body.current) return
+    swing.current = THREE.MathUtils.damp(swing.current, moving ? 1 : 0, 9, delta)
+    phase.current += delta * GAIT_CYCLES_PER_SECOND * Math.PI * 2
+    body.current.position.y = baseY + Math.abs(Math.sin(phase.current)) * 0.05 * swing.current
+    body.current.rotation.z = Math.sin(phase.current) * 0.06 * swing.current
+  })
+
   return (
-    <group scale={[width, height, width]} position={[0, MODEL_FEET_Y * (1 - height), 0]}>
+    <group ref={body} scale={[width, height, width]} position={[0, baseY, 0]}>
       <mesh castShadow position={[-0.12, -0.42, 0]}>
         <boxGeometry args={[0.16, 0.55, 0.18]} />
         <meshStandardMaterial color={ROBE_COLOR} />
@@ -222,12 +240,14 @@ function RiggedCharacterModel({
   asset,
   skinColor,
   shirtColor,
+  moving,
 }: {
   asset: ClassAsset
   skinColor: string
   shirtColor: string | null
+  moving: boolean
 }) {
-  const { scene } = useGLTF(asset.glb)
+  const { scene, animations } = useGLTF(asset.glb)
 
   const fitted = useMemo(() => {
     // Skinned meshes can't be shared between canvases — the player, the
@@ -263,6 +283,11 @@ function RiggedCharacterModel({
     return clone
   }, [scene, skinColor, shirtColor, asset])
 
+  // Whichever of the two the model is equipped for; each is inert for the
+  // other's rig.
+  useClipGait(fitted, animations, moving)
+  useProceduralGait(fitted, animations.length === 0, moving)
+
   return <primitive object={fitted} />
 }
 
@@ -281,7 +306,15 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
 // A plain low-poly humanoid stands in as the guaranteed model; the real
 // CC0 class model (loaded async) replaces it once ready, and any load/parse
 // failure falls back to the procedural model instead of breaking the scene.
-export function CharacterModel({ appearance }: { appearance: CharacterAppearance }) {
+export function CharacterModel({
+  appearance,
+  moving = false,
+}: {
+  appearance: CharacterAppearance
+  // Drives the walk cycle. Left off for the profile and battle portraits, so
+  // they stand and breathe rather than march on the spot.
+  moving?: boolean
+}) {
   const gender = appearance.gender ?? DEFAULT_GENDER
   const skinColor = appearance.skinColor ?? SKIN_FALLBACK_COLOR
   const asset = CHARACTER_ASSETS[gender][appearance.characterClass]
@@ -289,12 +322,22 @@ export function CharacterModel({ appearance }: { appearance: CharacterAppearance
   // placeholder — which has no outfit of its own — keeps its robe brown.
   const shirtColor = appearance.shirtColor ?? null
   const fallback = (
-    <ProceduralCharacterModel skinColor={skinColor} shirtColor={shirtColor ?? ROBE_COLOR} gender={gender} />
+    <ProceduralCharacterModel
+      skinColor={skinColor}
+      shirtColor={shirtColor ?? ROBE_COLOR}
+      gender={gender}
+      moving={moving}
+    />
   )
   return (
     <ModelErrorBoundary key={`${appearance.characterClass}-${gender}`} fallback={fallback}>
       <Suspense fallback={fallback}>
-        <RiggedCharacterModel asset={asset} skinColor={skinColor} shirtColor={shirtColor} />
+        <RiggedCharacterModel
+          asset={asset}
+          skinColor={skinColor}
+          shirtColor={shirtColor}
+          moving={moving}
+        />
       </Suspense>
     </ModelErrorBoundary>
   )
