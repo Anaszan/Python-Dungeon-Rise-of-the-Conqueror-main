@@ -1,4 +1,5 @@
 import type { CharacterClass, CharacterGender } from './characterOptions'
+import type { ShirtTarget } from './shirtTexture'
 
 // Which model file each class/gender combination loads, and how to dress it.
 // Kept apart from CharacterModel.tsx so the paths can be checked against
@@ -27,15 +28,18 @@ export type ClassAsset = {
   // Which surface follows the player's chosen shirt color — the same
   // material-name / mesh-name split as the skin fields above, and for the same
   // reason. On the women's packs one flat material is the garment, so the
-  // swatch lands on the shirt (or robe/cloak) alone. The men's models put
-  // their whole outfit in a single texture-painted mesh, so there the tint
-  // covers the outfit as a set — arms and boots included, since the mesh gives
-  // no way to separate them. Names are as GLTFLoader exposes them, i.e. with
-  // dots stripped ('ShoulderPad.R' in the file -> 'ShoulderPadR' here).
+  // swatch is simply assigned to it. The men's models share one painted atlas
+  // across the body, so there the garment is found in the texture instead
+  // (shirtTarget) and the repainted copy goes on these meshes. Names are as
+  // GLTFLoader exposes them, i.e. with dots stripped ('ShoulderPad.R' in the
+  // file -> 'ShoulderPadR' here).
   shirtMaterial?: string
   shirtMeshes?: string[]
-  // The color the outfit already ships in, used until the player picks a
-  // shirt color. '#ffffff' leaves a texture-painted model untinted.
+  shirtTarget?: ShirtTarget
+  // Roughly the color the outfit already looks like. The women's models are
+  // literally set to it until the player picks something (it is their
+  // material's own color); the men's textures are left alone, and it only
+  // colors the "keep the original outfit" swatch on the customize screen.
   defaultShirtColor: string
   // Material name (from the .glb) -> replacement color, for reusing one
   // outfit across two classes.
@@ -55,25 +59,35 @@ export const CHARACTER_ASSETS: Record<CharacterGender, Record<CharacterClass, Cl
       glb: '/models/warrior/Warrior.glb',
       skinMesh: 'Face',
       shirtMeshes: ['Warrior_Body', 'ShoulderPadR', 'ShoulderPadL'],
-      defaultShirtColor: '#ffffff',
+      // His plate is the only near-grey thing on the sheet; the leather, the
+      // red tabard and his bare hands all keep their own color.
+      shirtTarget: { kind: 'desaturated', maxSat: 0.09, minLightness: 0.15 },
+      defaultShirtColor: '#7c828b',
     },
     cleric: {
       glb: '/models/cleric/Cleric.glb',
       skinMesh: 'Head',
       shirtMeshes: ['Cleric', 'ShoulderPads'],
-      defaultShirtColor: '#ffffff',
+      // The undyed robe. His beard is just as pale but sits on the head mesh,
+      // which keeps the untouched texture.
+      shirtTarget: { kind: 'desaturated', maxSat: 0.09, minLightness: 0.15 },
+      defaultShirtColor: '#c8c2ad',
     },
     wizard: {
       glb: '/models/wizard/Wizard.glb',
       skinMesh: 'Face',
       shirtMeshes: ['Wizard', 'ShoulderPadL', 'ShoulderPadR', 'Pouch'],
-      defaultShirtColor: '#ffffff',
+      // Nothing else on his sheet is blue, so the robe recolors on its own and
+      // the gold trim survives.
+      shirtTarget: { kind: 'hue', hue: 222, tolerance: 40, minSat: 0.2 },
+      defaultShirtColor: '#2f4f9e',
     },
     rogue: {
       glb: '/models/rogue/Rogue.glb',
       skinMesh: 'Face',
       shirtMeshes: ['Rogue', 'Guard', 'Belt', 'Pouch'],
-      defaultShirtColor: '#ffffff',
+      shirtTarget: { kind: 'hue', hue: 350, tolerance: 25, minSat: 0.2 },
+      defaultShirtColor: '#7d2733',
     },
   },
   female: {

@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import type { CharacterClass, CharacterGender } from './characterOptions'
 import { DEFAULT_GENDER } from './characterOptions'
 import { CHARACTER_ASSETS, type ClassAsset } from './characterAssets'
+import { getRecoloredShirtMap } from './shirtTexture'
 
 const SKIN_FALLBACK_COLOR = '#e0b48a'
 const ROBE_COLOR = '#4a4030'
@@ -195,19 +196,23 @@ function attachWeapon(root: THREE.Object3D, weapon: THREE.Group, upright: boolea
   bone.add(weapon)
 }
 
-// Paints the chosen shirt color onto one outfit material.
+// Paints the chosen shirt color onto one outfit surface.
 //
-// The women's packs are flat-colored, so their swatch is used exactly as
-// picked. The men's are texture-painted and multiply this color into the
-// texture, where a mid-tone swatch would come out near-black (the same
-// flattening that keeps the skin tint off their body meshes) — so there the
-// tint is pushed up to full brightness first, which keeps the hue the player
-// picked and leaves the shading to the texture underneath.
-function applyShirtTint(material: THREE.MeshStandardMaterial, shirtColor: string) {
-  material.color.set(shirtColor)
-  if (!material.map) return
-  const peak = Math.max(material.color.r, material.color.g, material.color.b)
-  if (peak > 0) material.color.multiplyScalar(1 / peak)
+// Two different jobs behind one call: a flat-colored material (the women's
+// packs) is simply set to the color, while a texture-painted one (the men's)
+// gets a copy of its atlas with the garment repainted — tinting the material
+// there would drag the leather, the boots and his bare hands along with the
+// shirt. `shirtColor` is null until the player picks one: the flat materials
+// fall back to the color their outfit ships in, and the painted textures are
+// left alone.
+function applyShirt(material: THREE.MeshStandardMaterial, asset: ClassAsset, shirtColor: string | null) {
+  if (asset.shirtTarget === undefined) {
+    material.color.set(shirtColor ?? asset.defaultShirtColor)
+    return
+  }
+  if (shirtColor === null || !material.map) return
+  const repainted = getRecoloredShirtMap(material.map, asset.shirtTarget, shirtColor)
+  if (repainted) material.map = repainted
 }
 
 // The player model for one class/gender: the matching rigged .glb, rendered in
@@ -220,7 +225,7 @@ function RiggedCharacterModel({
 }: {
   asset: ClassAsset
   skinColor: string
-  shirtColor: string
+  shirtColor: string | null
 }) {
   const { scene } = useGLTF(asset.glb)
 
@@ -245,7 +250,7 @@ function RiggedCharacterModel({
       // Skin wins where the two overlap: on the men's models the shirt meshes
       // are whole bodies, and their face must stay the skin color.
       if (isSkin) material.color.set(skinColor)
-      else if (isShirt) applyShirtTint(material, shirtColor)
+      else if (isShirt) applyShirt(material, asset, shirtColor)
       else if (asset.recolor?.[source.name]) material.color.set(asset.recolor[source.name])
       child.material = material
     })
@@ -280,15 +285,11 @@ export function CharacterModel({ appearance }: { appearance: CharacterAppearance
   const gender = appearance.gender ?? DEFAULT_GENDER
   const skinColor = appearance.skinColor ?? SKIN_FALLBACK_COLOR
   const asset = CHARACTER_ASSETS[gender][appearance.characterClass]
-  // No pick yet: the real model keeps the color its outfit ships in, and the
-  // placeholder (which has no outfit of its own) keeps its robe brown.
-  const shirtColor = appearance.shirtColor ?? asset.defaultShirtColor
+  // No pick yet (null): the real model keeps the outfit it ships in, and the
+  // placeholder — which has no outfit of its own — keeps its robe brown.
+  const shirtColor = appearance.shirtColor ?? null
   const fallback = (
-    <ProceduralCharacterModel
-      skinColor={skinColor}
-      shirtColor={appearance.shirtColor ?? ROBE_COLOR}
-      gender={gender}
-    />
+    <ProceduralCharacterModel skinColor={skinColor} shirtColor={shirtColor ?? ROBE_COLOR} gender={gender} />
   )
   return (
     <ModelErrorBoundary key={`${appearance.characterClass}-${gender}`} fallback={fallback}>
