@@ -10,8 +10,10 @@ vi.mock('../audio/soundEngine', () => ({
   playAttackImpact: vi.fn(),
   playPlayerHurt: vi.fn(),
 }))
+// Signed in, so the tests below exercise the same persistence path a real
+// session takes rather than short-circuiting on a missing user id.
 vi.mock('../auth/authStore', () => ({
-  useAuthStore: { getState: () => ({ session: null }) },
+  useAuthStore: { getState: () => ({ session: { user: { id: 'test-user' } } }) },
 }))
 vi.mock('./persistence', () => ({
   saveProgress: vi.fn(),
@@ -19,6 +21,7 @@ vi.mock('./persistence', () => ({
 }))
 
 const { useGameStore } = await import('./store')
+const { saveProgress } = await import('./persistence')
 
 function defeatAllMonstersInLevel(levelIndex: number) {
   const ids = LEVELS[levelIndex].monsters.map((m) => m.id)
@@ -29,6 +32,48 @@ function defeatAllMonstersInLevel(levelIndex: number) {
 describe('useGameStore', () => {
   beforeEach(() => {
     useGameStore.getState().resetSave()
+    vi.mocked(saveProgress).mockClear()
+  })
+
+  // A save is only ever written on top of one that was read first. Without
+  // this, an account whose save failed to load would look like a brand-new
+  // player — level 1, no character — and the first thing that touched the
+  // store would write that over hours of real progress.
+  describe('writing back to Supabase', () => {
+    const loadedSave = {
+      defeatedMonsterIds: ['slime-1'],
+      playerHp: 120,
+      attackPower: BASE_ATTACK_POWER,
+      collectedPickupIds: [],
+      currentLevel: 2,
+      skillCooldown: 0,
+      characterClass: 'wizard' as const,
+      gender: DEFAULT_GENDER,
+      skinColor: DEFAULT_SKIN_COLOR,
+      shirtColor: null,
+      characterName: 'Rin',
+    }
+
+    it('writes nothing until this account’s own save has been read', () => {
+      useGameStore.getState().damagePlayer(10)
+      useGameStore.getState().healPlayer(5)
+      useGameStore.getState().confirmCharacter('wizard', 'female', '#abcdef', null, 'Rin')
+
+      expect(saveProgress).not.toHaveBeenCalled()
+    })
+
+    it('writes once a save has been hydrated', () => {
+      useGameStore.getState().hydrateSave(loadedSave)
+
+      useGameStore.getState().damagePlayer(10)
+
+      expect(saveProgress).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(saveProgress).mock.calls[0][1]).toMatchObject({
+        currentLevel: 2,
+        characterName: 'Rin',
+        playerHp: 110,
+      })
+    })
   })
 
   it('starts with the documented defaults', () => {

@@ -89,6 +89,10 @@ type GameState = {
 function persist() {
   const userId = useAuthStore.getState().session?.user.id
   if (!userId) return
+  // Nothing is written until this account's own save has been read back. The
+  // state before that is placeholder — level 1, full HP, no character — and
+  // writing it would overwrite a real save with a blank one.
+  if (!useGameStore.getState().saveLoaded) return
   const {
     defeatedIds,
     playerHp,

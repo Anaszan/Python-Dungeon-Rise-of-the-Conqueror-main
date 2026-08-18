@@ -17,6 +17,16 @@ export type SaveData = {
   characterName: string | null
 }
 
+// Throws if the save cannot be read, and the caller (App) keeps the player on
+// a retry screen rather than starting the game.
+//
+// The tempting shortcut — log the error and hand back a blank save — costs a
+// player their character: a blank save has no character_class or
+// character_name, which is the app's own definition of "this player has never
+// made a character", so a single failed read would send someone who has played
+// for hours back to the customize screen and then overwrite their real save
+// with a level-1 one. A row that genuinely is not there is a different answer
+// and still comes back as a blank save; only a *failed question* throws.
 export async function loadSave(userId: string): Promise<SaveData> {
   const { data, error } = await supabase
     .from('game_saves')
@@ -26,7 +36,7 @@ export async function loadSave(userId: string): Promise<SaveData> {
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (error) console.error('Failed to load save:', error.message)
+  if (error) throw new Error(error.message)
 
   return {
     defeatedMonsterIds: data?.defeated_monster_ids ?? [],

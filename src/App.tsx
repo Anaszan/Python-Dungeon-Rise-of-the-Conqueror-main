@@ -7,6 +7,7 @@ import { StoryIntro } from './screens/StoryIntro'
 import { LoginScreen } from './screens/LoginScreen'
 import { ResetPasswordScreen } from './screens/ResetPasswordScreen'
 import { CharacterCustomize } from './screens/CharacterCustomize'
+import { SaveLoadError } from './screens/SaveLoadError'
 import { ChapterIntro } from './screens/ChapterIntro'
 import { Leaderboard } from './screens/Leaderboard'
 import { LogoutButton } from './screens/LogoutButton'
@@ -31,6 +32,9 @@ function App() {
   const [pastLanding, setPastLanding] = useState(false)
   const [pastIntro, setPastIntro] = useState(false)
   const [chapterIntroSeenFor, setChapterIntroSeenFor] = useState<number | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  // Bumped by the retry button to re-run the load effect.
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const { session, loading, passwordRecovery } = useAuthStore()
   const hydrateSave = useGameStore((s) => s.hydrateSave)
   const resetSave = useGameStore((s) => s.resetSave)
@@ -42,9 +46,26 @@ function App() {
 
   useEffect(() => {
     resetSave()
+    setLoadFailed(false)
     if (!session) return
-    loadSave(session.user.id).then(hydrateSave)
-  }, [session, hydrateSave, resetSave])
+
+    let cancelled = false
+    loadSave(session.user.id).then(
+      (save) => {
+        if (!cancelled) hydrateSave(save)
+      },
+      (error) => {
+        // Deliberately not falling through to a blank save: that would read as
+        // a brand-new player and send someone with a character straight back
+        // to the customize screen. See loadSave.
+        console.error('Failed to load save:', error)
+        if (!cancelled) setLoadFailed(true)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [session, hydrateSave, resetSave, loadAttempt])
 
   useEffect(() => {
     // Covers the Google OAuth redirect: the browser does a full-page reload
@@ -77,6 +98,10 @@ function App() {
     content = <StoryIntro onStart={() => setPastIntro(true)} />
     playMenuMusic = true
     showSoundToggle = true
+  } else if (loadFailed) {
+    content = <SaveLoadError onRetry={() => setLoadAttempt((n) => n + 1)} />
+    playMenuMusic = true
+    showSoundToggle = true
   } else if (!saveLoaded) {
     content = (
       <div className="screen-overlay">
@@ -86,6 +111,9 @@ function App() {
     playMenuMusic = true
     showSoundToggle = true
   } else if (!characterClass || !characterName) {
+    // Only ever reached by a player whose save was read and genuinely has no
+    // character yet — so making one happens once, before the first game, and
+    // never again.
     content = <CharacterCustomize />
     playMenuMusic = true
     showSoundToggle = true
