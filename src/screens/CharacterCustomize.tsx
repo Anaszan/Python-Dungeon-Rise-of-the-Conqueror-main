@@ -13,12 +13,21 @@ import {
 } from '../character/characterOptions'
 import { CHARACTER_ASSETS } from '../character/characterAssets'
 import { CharacterModel } from '../character/CharacterModel'
-import { isCharacterNameTaken } from '../game/persistence'
+import { claimCharacterName, isCharacterNameTaken } from '../game/persistence'
+import {
+  NAME_MAX_LENGTH,
+  NAME_MIN_LENGTH,
+  isSameCharacterName,
+  isValidCharacterName,
+  normalizeCharacterName,
+} from '../game/characterName'
 
-const NAME_MIN_LENGTH = 2
-const NAME_MAX_LENGTH = 20
-
-type NameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'error'
+// 'checking' is the lookup while the player types; 'claiming' is the one that
+// decides, on the way into the game. Only 'available' and 'claiming' come from
+// a name the database has actually been asked about — every other state leaves
+// the adventure button disabled, including the two failure states, because a
+// name that could not be checked is not a name that is known to be free.
+type NameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'error' | 'claiming' | 'claimFailed'
 
 export function CharacterCustomize() {
   const storeClass = useGameStore((s) => s.characterClass)
@@ -39,22 +48,21 @@ export function CharacterCustomize() {
   const [nameStatus, setNameStatus] = useState<NameStatus>('idle')
 
   useEffect(() => {
-    const trimmed = characterName.trim()
+    const name = normalizeCharacterName(characterName)
 
-    // Unchanged from the name already saved on this account — no need to
-    // check it against itself (the unique constraint would only ever match
-    // this same row anyway).
-    if (trimmed === (storeName ?? '')) {
+    // Already this account's own name — the database excludes the caller's own
+    // save from the check, so asking would only ever come back free.
+    if (storeName !== null && isSameCharacterName(name, storeName)) {
       setNameStatus('idle')
       return
     }
 
-    if (trimmed.length === 0) {
+    if (name.length === 0) {
       setNameStatus('idle')
       return
     }
 
-    if (trimmed.length < NAME_MIN_LENGTH || trimmed.length > NAME_MAX_LENGTH) {
+    if (!isValidCharacterName(name)) {
       setNameStatus('invalid')
       return
     }
@@ -63,7 +71,7 @@ export function CharacterCustomize() {
     let cancelled = false
     const timer = setTimeout(async () => {
       try {
-        const taken = await isCharacterNameTaken(trimmed)
+        const taken = await isCharacterNameTaken(name)
         if (!cancelled) setNameStatus(taken ? 'taken' : 'available')
       } catch {
         if (!cancelled) setNameStatus('error')
@@ -76,10 +84,34 @@ export function CharacterCustomize() {
     }
   }, [characterName, storeName])
 
-  const trimmedName = characterName.trim()
-  const nameUnchanged = trimmedName === (storeName ?? '') && trimmedName.length > 0
-  const canConfirm = nameUnchanged || nameStatus === 'available'
+  const trimmedName = normalizeCharacterName(characterName)
+  const nameUnchanged =
+    storeName !== null && trimmedName.length > 0 && isSameCharacterName(trimmedName, storeName)
+  const canConfirm =
+    isValidCharacterName(trimmedName) &&
+    (nameUnchanged || nameStatus === 'available') &&
+    nameStatus !== 'claiming'
   const outfitColor = CHARACTER_ASSETS[gender][characterClass].defaultShirtColor
+
+  // The button does not start the game — this does, and only once Postgres has
+  // handed this player the name. A duplicate that slipped past the check while
+  // they were picking colors is caught right here, and leaves them on this
+  // screen with the name marked taken instead of walking into a dungeon under
+  // a name whose save can never be written.
+  const startAdventure = async () => {
+    if (!canConfirm) return
+    setNameStatus('claiming')
+    try {
+      if (!(await claimCharacterName(trimmedName))) {
+        setNameStatus('taken')
+        return
+      }
+    } catch {
+      setNameStatus('claimFailed')
+      return
+    }
+    confirmCharacter(characterClass, gender, skinColor, shirtColor, trimmedName)
+  }
 
   return (
     <div className="screen-overlay">
@@ -108,6 +140,7 @@ export function CharacterCustomize() {
             placeholder="ตั้งชื่อตัวละครของคุณ"
           />
           {nameStatus === 'checking' && <p className="customize-name-status">กำลังตรวจสอบชื่อ...</p>}
+          {nameStatus === 'claiming' && <p className="customize-name-status">กำลังจองชื่อ...</p>}
           {nameStatus === 'taken' && <p className="customize-name-status customize-name-error">ชื่อนี้ถูกใช้ไปแล้ว กรุณาเลือกชื่ออื่น</p>}
           {nameStatus === 'invalid' && (
             <p className="customize-name-status customize-name-error">
@@ -116,6 +149,9 @@ export function CharacterCustomize() {
           )}
           {nameStatus === 'error' && (
             <p className="customize-name-status customize-name-error">ตรวจสอบชื่อไม่สำเร็จ กรุณาลองใหม่</p>
+          )}
+          {nameStatus === 'claimFailed' && (
+            <p className="customize-name-status customize-name-error">จองชื่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</p>
           )}
           {nameStatus === 'available' && <p className="customize-name-status customize-name-ok">ชื่อนี้ใช้ได้</p>}
         </div>
@@ -199,13 +235,8 @@ export function CharacterCustomize() {
           </div>
         </div>
 
-        <button
-          type="button"
-          className="customize-confirm"
-          disabled={!canConfirm}
-          onClick={() => confirmCharacter(characterClass, gender, skinColor, shirtColor, trimmedName)}
-        >
-          เริ่มการผจญภัย
+        <button type="button" className="customize-confirm" disabled={!canConfirm} onClick={startAdventure}>
+          {nameStatus === 'claiming' ? 'กำลังจองชื่อ...' : 'เริ่มการผจญภัย'}
         </button>
       </div>
     </div>

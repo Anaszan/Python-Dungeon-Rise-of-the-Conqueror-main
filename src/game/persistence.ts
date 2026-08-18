@@ -67,18 +67,29 @@ export async function saveProgress(userId: string, save: SaveData) {
   if (error) console.error('Failed to save progress:', error.message)
 }
 
-// Lets CharacterCustomize show a friendly "already taken" error before the
-// player confirms, instead of a raw unique-constraint violation from the
-// upsert above — same pattern as is_identifier_taken for nicknames.
+// Lets CharacterCustomize show a friendly "already taken" error while the
+// player is still typing, instead of a raw unique-constraint violation from
+// the upsert above — same pattern as is_identifier_taken for nicknames.
+//
+// This throws rather than reporting "not taken" when the lookup itself fails.
+// Swallowing the error would answer a question it never actually asked, and
+// the answer it invents is the dangerous one: an unreachable database, or a
+// project missing migrations_010, would wave every duplicate straight through.
 export async function isCharacterNameTaken(name: string): Promise<boolean> {
   const { data, error } = await supabase.rpc('is_character_name_taken', { p_name: name })
-
-  if (error) {
-    console.error('Failed to check character name:', error.message)
-    return false
-  }
-
+  if (error) throw new Error(error.message)
   return data ?? false
+}
+
+// Takes the name for this player, or returns false if someone else got there
+// first. The check above is only ever advice — two players can both be told a
+// free name is free — so this is what actually settles it, in one statement
+// inside Postgres (migrations_010), and the customize screen refuses to start
+// the game until it comes back true.
+export async function claimCharacterName(name: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('claim_character_name', { p_name: name })
+  if (error) throw new Error(error.message)
+  return data === true
 }
 
 export async function submitScore(userId: string, monstersDefeated: number) {
