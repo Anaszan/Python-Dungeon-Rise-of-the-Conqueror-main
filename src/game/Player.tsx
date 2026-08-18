@@ -30,9 +30,9 @@ export function Player({
   const facing = useRef(0)
   const dir = useRef(new THREE.Vector3())
   // Walk-cycle accumulator: a fake gait (bob + side-to-side sway) applied to
-  // the model only, since the CC0 assets are static OBJ meshes with no
-  // skeleton/animation to drive a real one. bobAmount eases toward 0/1 so
-  // starting and stopping don't snap.
+  // the model only. Every class model is rigged now, but nothing drives those
+  // skeletons yet, so this stands in until a real walk cycle does.
+  // bobAmount eases toward 0/1 so starting and stopping don't snap.
   const walkPhase = useRef(0)
   const bobAmount = useRef(0)
   const characterClass = useGameStore((s) => s.characterClass) ?? DEFAULT_CHARACTER_CLASS

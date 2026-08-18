@@ -10,3 +10,10 @@ CC0 1.0 Universal (CC0 1.0)
 Public Domain Dedication
 https://creativecommons.org/publicdomain/zero/1.0/
 
+------------------------------------------------------
+Note on the .glb next to the .obj
+
+The .glb in this folder is generated from the .obj by tools/rig_male.py: same
+geometry, same textures, plus a fitted skeleton whose bone names match the
+women pack in ../female so both genders load through one code path. In its bind
+pose it renders identically to the .obj. Still CC0, still Quaternius' artwork.

@@ -1,11 +1,10 @@
 import { Component, Suspense, useMemo, type ReactNode } from 'react'
-import { useGLTF, useTexture } from '@react-three/drei'
-import { useLoader } from '@react-three/fiber'
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
+import { useGLTF } from '@react-three/drei'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import * as THREE from 'three'
 import type { CharacterClass, CharacterGender } from './characterOptions'
 import { DEFAULT_GENDER } from './characterOptions'
+import { CHARACTER_ASSETS, type ClassAsset } from './characterAssets'
 
 const SKIN_FALLBACK_COLOR = '#e0b48a'
 const ROBE_COLOR = '#4a4030'
@@ -24,104 +23,16 @@ export type CharacterAppearance = {
 const MODEL_HEIGHT = 1.3
 const MODEL_FEET_Y = -0.65
 
-// Each gender has its own sculpted model per class, both from the same CC0
-// artist so the two read as one art style:
+// Where a weapon goes in the rig. The values are the local transform of the
+// sword that ships parented to the right hand inside HoodedAdventurer.glb —
+// every model in the women pack shares one armature, and rig_male.py names the
+// men's bones to match, so the same grip works on all of them. Note the
+// women's rig is authored at 1/100 scale (its armature node scales by 100),
+// which is why these numbers look tiny; the weapon meshes themselves are built
+// in normal model units and scaled by the bone's own world scale at attach
+// time, which keeps the same grip correct on the men's 1:1 rig.
 //
-//   male   -> "LowPoly RPG Characters" by Quaternius (public/models/<class>),
-//             one textured .obj per class, weapon modelled in.
-//   female -> "Ultimate Modular Women Pack" by Quaternius
-//             (public/models/female), rigged .glb with flat-colored
-//             materials and no texture pages.
-//
-// Both are CC0 1.0; see the License.txt next to each set.
-
-// Male assets. weaponMatch/skinMatch are substrings of each mesh's name
-// (OBJLoader sets Mesh.name from the .obj's `o` lines) used to decide which
-// texture page a mesh takes and whether it is the bare face that follows
-// the player's chosen skin color.
-type MaleAsset = {
-  obj: string
-  bodyTex: string
-  weaponTex: string
-  weaponMatch: string
-  skinMatch: string
-}
-
-const MALE_ASSETS: Record<CharacterClass, MaleAsset> = {
-  warrior: {
-    obj: '/models/warrior/Warrior.obj',
-    bodyTex: '/models/warrior/Warrior_Texture.png',
-    weaponTex: '/models/warrior/Warrior_Sword_Texture.png',
-    weaponMatch: 'Sword',
-    skinMatch: 'Face',
-  },
-  cleric: {
-    obj: '/models/cleric/Cleric.obj',
-    bodyTex: '/models/cleric/Cleric_Texture.png',
-    weaponTex: '/models/cleric/Cleric_Staff_Texture.png',
-    weaponMatch: 'Staff',
-    skinMatch: 'Head',
-  },
-  wizard: {
-    obj: '/models/wizard/Wizard.obj',
-    bodyTex: '/models/wizard/Wizard_Texture.png',
-    weaponTex: '/models/wizard/Wizard_Staff_Texture.png',
-    weaponMatch: 'Staff',
-    skinMatch: 'Face',
-  },
-  rogue: {
-    obj: '/models/rogue/Rogue.obj',
-    bodyTex: '/models/rogue/Rogue_Texture.png',
-    weaponTex: '/models/rogue/Rogue_Dagger_Texture.png',
-    weaponMatch: 'Dagger',
-    skinMatch: 'Face',
-  },
-}
-
-// Female assets. Only three meshes cover four classes: the witch dresses
-// both caster classes, recolored white/gold for the cleric so the two never
-// look like the same character. `weapon` fills in what the outfit doesn't
-// ship — only the hooded adventurer comes with a blade in hand.
-type FemaleAsset = {
-  glb: string
-  // Material name (from the .glb) -> replacement color. 'Skin' is handled
-  // separately since it follows the player's chosen skin color.
-  recolor?: Record<string, string>
-  weapon?: 'dagger' | 'staff'
-  staffOrbColor?: string
-}
-
-const FEMALE_ASSETS: Record<CharacterClass, FemaleAsset> = {
-  warrior: { glb: '/models/female/HoodedAdventurer.glb' },
-  rogue: { glb: '/models/female/Adventurer.glb', weapon: 'dagger' },
-  wizard: {
-    glb: '/models/female/Witch.glb',
-    weapon: 'staff',
-    staffOrbColor: '#8be3ff',
-  },
-  cleric: {
-    glb: '/models/female/Witch.glb',
-    recolor: {
-      Purple: '#e9e1cd',
-      Gold: '#c9a227',
-      Brown2: '#7c6a48',
-      Hair_Black: '#7a5230',
-      Brown: '#4a3b2a',
-    },
-    weapon: 'staff',
-    staffOrbColor: '#ffd98a',
-  },
-}
-
-// Where a weapon goes in the women pack's rig. The values are the local
-// transform of the sword that ships parented to the right hand inside
-// HoodedAdventurer.glb — every model in the pack shares one armature, so the
-// same grip works on all of them. Note the rig is authored at 1/100 scale
-// (its armature node scales by 100), which is why these numbers look tiny;
-// the weapon meshes themselves are built in normal model units and scaled by
-// the bone's own world scale at attach time.
-//
-// The bone is named `Middle1.R` in the file; GLTFLoader strips the dot.
+// The bone is named `Middle1.R` in both files; GLTFLoader strips the dot.
 const GRIP_BONE = 'Middle1R'
 const GRIP_POSITION: [number, number, number] = [-0.0000042, 0.0009108, -0.0002511]
 const GRIP_QUATERNION: [number, number, number, number] = [0.0006481, 0, -0.7120197, 0.7021592]
@@ -272,51 +183,17 @@ function attachWeapon(root: THREE.Object3D, weapon: THREE.Group, upright: boolea
   bone.add(weapon)
 }
 
-// The male player model: the class's textured .obj. Only the head/face mesh
-// takes skinColor (a whole-model tint washed the armor/robe detail out to a
-// dark silhouette in earlier testing); the weapon and body meshes keep their
-// own painted texture untinted.
-function MaleCharacterModel({ characterClass, skinColor }: Omit<CharacterAppearance, 'gender'>) {
-  const asset = MALE_ASSETS[characterClass]
-  const obj = useLoader(OBJLoader, asset.obj)
-  const bodyTex = useTexture(asset.bodyTex)
-  const weaponTex = useTexture(asset.weaponTex)
-
-  const fitted = useMemo(() => {
-    bodyTex.colorSpace = THREE.SRGBColorSpace
-    weaponTex.colorSpace = THREE.SRGBColorSpace
-
-    // Cloned per instance because the player, the profile portrait and the
-    // combat portrait can all be on screen at once, and each canvas needs
-    // its own object graph.
-    const clone = obj.clone(true)
-    clone.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return
-      const isWeapon = child.name.includes(asset.weaponMatch)
-      const isSkin = child.name.includes(asset.skinMatch)
-      child.material = new THREE.MeshStandardMaterial({
-        map: isWeapon ? weaponTex : bodyTex,
-        color: isSkin ? skinColor : '#ffffff',
-      })
-      child.castShadow = true
-    })
-
-    fitToPlayerSlot(clone)
-    return clone
-  }, [obj, bodyTex, weaponTex, asset, skinColor])
-
-  return <primitive object={fitted} />
-}
-
-// The female player model: the class's rigged .glb, rendered in its bind
-// pose (the pack's animations go unused) so she just stands there.
-function FemaleCharacterModel({ characterClass, skinColor }: Omit<CharacterAppearance, 'gender'>) {
-  const asset = FEMALE_ASSETS[characterClass]
+// The player model for one class/gender: the matching rigged .glb, rendered in
+// its bind pose (the packs' animation clips go unused) so the character just
+// stands there.
+function RiggedCharacterModel({ asset, skinColor }: { asset: ClassAsset; skinColor: string }) {
   const { scene } = useGLTF(asset.glb)
 
   const fitted = useMemo(() => {
-    // Skinned meshes can't be shared between canvases, so this clones the
-    // skeleton too rather than the scene graph alone.
+    // Skinned meshes can't be shared between canvases — the player, the
+    // profile portrait and the combat portrait can all be on screen at once,
+    // and each canvas needs its own object graph — so this clones the skeleton
+    // too rather than the scene graph alone.
     const clone = cloneSkinned(scene)
 
     clone.traverse((child) => {
@@ -324,7 +201,10 @@ function FemaleCharacterModel({ characterClass, skinColor }: Omit<CharacterAppea
       child.castShadow = true
       const source = child.material as THREE.MeshStandardMaterial
       const material = source.clone()
-      if (source.name === 'Skin') material.color.set(skinColor)
+      const isSkin =
+        (asset.skinMaterial !== undefined && source.name === asset.skinMaterial) ||
+        (asset.skinMesh !== undefined && child.name.includes(asset.skinMesh))
+      if (isSkin) material.color.set(skinColor)
       else if (asset.recolor?.[source.name]) material.color.set(asset.recolor[source.name])
       child.material = material
     })
@@ -353,18 +233,17 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
 }
 
 // A plain low-poly humanoid stands in as the guaranteed model; the real
-// downloaded CC0 class model (loaded async) replaces it once ready, and any
-// load/parse failure falls back to the procedural model instead of
-// breaking the scene.
+// CC0 class model (loaded async) replaces it once ready, and any load/parse
+// failure falls back to the procedural model instead of breaking the scene.
 export function CharacterModel({ appearance }: { appearance: CharacterAppearance }) {
   const gender = appearance.gender ?? DEFAULT_GENDER
   const skinColor = appearance.skinColor ?? SKIN_FALLBACK_COLOR
-  const Model = gender === 'male' ? MaleCharacterModel : FemaleCharacterModel
+  const asset = CHARACTER_ASSETS[gender][appearance.characterClass]
   const fallback = <ProceduralCharacterModel skinColor={skinColor} gender={gender} />
   return (
     <ModelErrorBoundary key={`${appearance.characterClass}-${gender}`} fallback={fallback}>
       <Suspense fallback={fallback}>
-        <Model characterClass={appearance.characterClass} skinColor={skinColor} />
+        <RiggedCharacterModel asset={asset} skinColor={skinColor} />
       </Suspense>
     </ModelErrorBoundary>
   )
