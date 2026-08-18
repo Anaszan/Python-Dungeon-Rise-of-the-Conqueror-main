@@ -12,6 +12,14 @@ function publicPath(url: string) {
   return fileURLToPath(new URL(`../../public${url}`, import.meta.url))
 }
 
+function gltfJson(url: string) {
+  const buffer = readFileSync(publicPath(url))
+  return JSON.parse(buffer.subarray(20, 20 + buffer.readUInt32LE(12)).toString()) as {
+    materials?: { name: string }[]
+    nodes?: { name: string }[]
+  }
+}
+
 describe('character models', () => {
   it('has an asset for every class the customize screen offers', () => {
     for (const gender of GENDER_OPTIONS) {
@@ -34,6 +42,42 @@ describe('character models', () => {
         expect(buffer.subarray(0, 4).toString(), `${asset.glb} is not a .glb`).toBe('glTF')
         const json = buffer.subarray(20, 20 + buffer.readUInt32LE(12)).toString()
         expect(json, `${asset.glb} has no skin`).toContain('"skins"')
+      }
+    }
+  })
+
+  // The skin/shirt tints are matched by name against the loaded model, so a
+  // typo (or a repacked .glb that renamed something) would silently leave the
+  // player's color picker with nothing to paint. Check the names are in there.
+  it('names surfaces the color pickers can actually find', () => {
+    for (const [gender, classes] of Object.entries(CHARACTER_ASSETS)) {
+      for (const [cls, asset] of Object.entries(classes)) {
+        const { materials = [], nodes = [] } = gltfJson(asset.glb)
+        const materialNames = materials.map((m) => m.name)
+        // GLTFLoader strips dots out of node names, so compare like for like.
+        const nodeNames = nodes.map((n) => n.name.replace(/\./g, ''))
+        const where = `${gender}/${cls}`
+
+        for (const material of [asset.skinMaterial, asset.shirtMaterial, ...Object.keys(asset.recolor ?? {})]) {
+          if (material === undefined) continue
+          expect(materialNames, `${where}: no material named ${material}`).toContain(material)
+        }
+        if (asset.skinMesh !== undefined) {
+          expect(
+            nodeNames.some((name) => name.includes(asset.skinMesh as string)),
+            `${where}: no mesh matching ${asset.skinMesh}`,
+          ).toBe(true)
+        }
+        for (const mesh of asset.shirtMeshes ?? []) {
+          expect(nodeNames, `${where}: no mesh named ${mesh}`).toContain(mesh)
+        }
+
+        // Either a material or a mesh has to be selected, or the shirt picker
+        // does nothing for this character.
+        expect(
+          asset.shirtMaterial !== undefined || (asset.shirtMeshes?.length ?? 0) > 0,
+          `${where}: nothing follows the shirt color`,
+        ).toBe(true)
       }
     }
   })

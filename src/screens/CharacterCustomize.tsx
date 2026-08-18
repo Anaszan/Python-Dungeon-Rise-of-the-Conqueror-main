@@ -6,10 +6,12 @@ import {
   CHARACTER_CLASS_OPTIONS,
   GENDER_OPTIONS,
   SKIN_COLOR_OPTIONS,
+  SHIRT_COLOR_OPTIONS,
   DEFAULT_CHARACTER_CLASS,
   DEFAULT_GENDER,
   DEFAULT_SKIN_COLOR,
 } from '../character/characterOptions'
+import { CHARACTER_ASSETS } from '../character/characterAssets'
 import { CharacterModel } from '../character/CharacterModel'
 import { isCharacterNameTaken } from '../game/persistence'
 
@@ -22,12 +24,17 @@ export function CharacterCustomize() {
   const storeClass = useGameStore((s) => s.characterClass)
   const storeGender = useGameStore((s) => s.gender)
   const storeSkinColor = useGameStore((s) => s.skinColor)
+  const storeShirtColor = useGameStore((s) => s.shirtColor)
   const storeName = useGameStore((s) => s.characterName)
   const confirmCharacter = useGameStore((s) => s.confirmCharacter)
 
   const [characterClass, setCharacterClass] = useState(storeClass ?? DEFAULT_CHARACTER_CLASS)
   const [gender, setGender] = useState(storeGender ?? DEFAULT_GENDER)
   const [skinColor, setSkinColor] = useState(storeSkinColor ?? DEFAULT_SKIN_COLOR)
+  // null until the player picks a shirt: the outfit then keeps whatever color
+  // the chosen class's model ships in, which is also what the first swatch
+  // below shows and switches back to.
+  const [shirtColor, setShirtColor] = useState<string | null>(storeShirtColor ?? null)
   const [characterName, setCharacterName] = useState(storeName ?? '')
   const [nameStatus, setNameStatus] = useState<NameStatus>('idle')
 
@@ -72,6 +79,7 @@ export function CharacterCustomize() {
   const trimmedName = characterName.trim()
   const nameUnchanged = trimmedName === (storeName ?? '') && trimmedName.length > 0
   const canConfirm = nameUnchanged || nameStatus === 'available'
+  const outfitColor = CHARACTER_ASSETS[gender][characterClass].defaultShirtColor
 
   return (
     <div className="screen-overlay">
@@ -83,7 +91,7 @@ export function CharacterCustomize() {
             <ambientLight intensity={0.8} />
             <directionalLight position={[2, 3, 2]} intensity={1} />
             <group position={[0, -0.3, 0]}>
-              <CharacterModel appearance={{ characterClass, gender, skinColor }} />
+              <CharacterModel appearance={{ characterClass, gender, skinColor, shirtColor }} />
             </group>
             <OrbitControls enablePan={false} enableZoom={false} />
           </Canvas>
@@ -162,11 +170,40 @@ export function CharacterCustomize() {
           </div>
         </div>
 
+        {/* Separate from the skin row above: this one only touches the outfit
+            (the robe/cloak on the women's models, the whole texture-painted
+            outfit on the men's — see shirtMaterial / shirtMeshes). */}
+        <div className="customize-section">
+          <p>สีเสื้อ</p>
+          <div className="swatch-row">
+            <button
+              type="button"
+              className={`swatch swatch-default ${shirtColor === null ? 'swatch-active' : ''}`}
+              style={{ background: outfitColor }}
+              aria-label="สีชุดเดิมของอาชีพ"
+              title="สีชุดเดิมของอาชีพ"
+              onClick={() => setShirtColor(null)}
+            >
+              ↺
+            </button>
+            {SHIRT_COLOR_OPTIONS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`swatch ${shirtColor === color ? 'swatch-active' : ''}`}
+                style={{ background: color }}
+                aria-label={color}
+                onClick={() => setShirtColor(color)}
+              />
+            ))}
+          </div>
+        </div>
+
         <button
           type="button"
           className="customize-confirm"
           disabled={!canConfirm}
-          onClick={() => confirmCharacter(characterClass, gender, skinColor, trimmedName)}
+          onClick={() => confirmCharacter(characterClass, gender, skinColor, shirtColor, trimmedName)}
         >
           เริ่มการผจญภัย
         </button>

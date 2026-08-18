@@ -13,6 +13,7 @@ export type SaveData = {
   characterClass: CharacterClass | null
   gender: CharacterGender
   skinColor: string
+  shirtColor: string | null
   characterName: string | null
 }
 
@@ -20,7 +21,7 @@ export async function loadSave(userId: string): Promise<SaveData> {
   const { data, error } = await supabase
     .from('game_saves')
     .select(
-      'defeated_monster_ids, player_hp, attack_power, collected_pickup_ids, current_level, skill_cooldown, character_class, gender, skin_color, character_name',
+      'defeated_monster_ids, player_hp, attack_power, collected_pickup_ids, current_level, skill_cooldown, character_class, gender, skin_color, shirt_color, character_name',
     )
     .eq('user_id', userId)
     .maybeSingle()
@@ -39,6 +40,9 @@ export async function loadSave(userId: string): Promise<SaveData> {
     // model they've always been rendered with.
     gender: (data?.gender as CharacterGender | null) ?? DEFAULT_GENDER,
     skinColor: data?.skin_color ?? DEFAULT_SKIN_COLOR,
+    // Saves written before migrations_009 have no shirt color — null keeps
+    // their outfit exactly the color it has always rendered in.
+    shirtColor: data?.shirt_color ?? null,
     characterName: data?.character_name ?? null,
   }
 }
@@ -55,6 +59,7 @@ export async function saveProgress(userId: string, save: SaveData) {
     character_class: save.characterClass,
     gender: save.gender,
     skin_color: save.skinColor,
+    shirt_color: save.shirtColor,
     character_name: save.characterName,
     updated_at: new Date().toISOString(),
   })

@@ -11,6 +11,7 @@ export function PlayerProfile() {
   const characterClass = useGameStore((s) => s.characterClass)
   const gender = useGameStore((s) => s.gender)
   const skinColor = useGameStore((s) => s.skinColor)
+  const shirtColor = useGameStore((s) => s.shirtColor)
   const attackPower = useGameStore((s) => s.attackPower)
   const playerHp = useGameStore((s) => s.playerHp)
   const defeatedIds = useGameStore((s) => s.defeatedIds)
@@ -39,7 +40,7 @@ export function PlayerProfile() {
             <div className="profile-header">
               {characterClass && (
                 <div className="profile-portrait">
-                  <CharacterPortrait appearance={{ characterClass, gender, skinColor }} />
+                  <CharacterPortrait appearance={{ characterClass, gender, skinColor, shirtColor }} />
                 </div>
               )}
               <div className="profile-identity">

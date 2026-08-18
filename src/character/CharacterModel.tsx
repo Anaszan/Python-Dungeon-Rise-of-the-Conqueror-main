@@ -15,6 +15,9 @@ export type CharacterAppearance = {
   characterClass: CharacterClass
   gender: CharacterGender
   skinColor: string
+  // null (or absent, for saves written before the shirt picker existed) keeps
+  // the outfit's own color — see defaultShirtColor in characterAssets.ts.
+  shirtColor?: string | null
 }
 
 // Target vertical footprint every player model (procedural or real) fits
@@ -63,8 +66,17 @@ function Ponytail({ position }: { position: [number, number, number] }) {
 }
 
 // Guaranteed fallback if a class's real model fails to load: a plain
-// low-poly humanoid with just the head/hands tinted by skinColor.
-function ProceduralCharacterModel({ skinColor, gender }: { skinColor: string; gender: CharacterGender }) {
+// low-poly humanoid with the head/hands tinted by skinColor and the torso and
+// sleeves by shirtColor, the same two-way split the real models get.
+function ProceduralCharacterModel({
+  skinColor,
+  shirtColor,
+  gender,
+}: {
+  skinColor: string
+  shirtColor: string
+  gender: CharacterGender
+}) {
   const { width, height } = GENDER_PROPORTIONS[gender]
   return (
     <group scale={[width, height, width]} position={[0, MODEL_FEET_Y * (1 - height), 0]}>
@@ -79,14 +91,14 @@ function ProceduralCharacterModel({ skinColor, gender }: { skinColor: string; ge
 
       <mesh castShadow position={[0, 0.08, 0]}>
         <boxGeometry args={[0.5, 0.48, 0.3]} />
-        <meshStandardMaterial color={ROBE_COLOR} />
+        <meshStandardMaterial color={shirtColor} />
       </mesh>
 
       {[-1, 1].map((side) => (
         <group key={side}>
           <mesh castShadow position={[side * 0.32, 0.1, 0]}>
             <cylinderGeometry args={[0.08, 0.09, 0.42, 8]} />
-            <meshStandardMaterial color={ROBE_COLOR} />
+            <meshStandardMaterial color={shirtColor} />
           </mesh>
           <mesh castShadow position={[side * 0.32, -0.14, 0]}>
             <sphereGeometry args={[0.08, 8, 8]} />
@@ -183,10 +195,33 @@ function attachWeapon(root: THREE.Object3D, weapon: THREE.Group, upright: boolea
   bone.add(weapon)
 }
 
+// Paints the chosen shirt color onto one outfit material.
+//
+// The women's packs are flat-colored, so their swatch is used exactly as
+// picked. The men's are texture-painted and multiply this color into the
+// texture, where a mid-tone swatch would come out near-black (the same
+// flattening that keeps the skin tint off their body meshes) — so there the
+// tint is pushed up to full brightness first, which keeps the hue the player
+// picked and leaves the shading to the texture underneath.
+function applyShirtTint(material: THREE.MeshStandardMaterial, shirtColor: string) {
+  material.color.set(shirtColor)
+  if (!material.map) return
+  const peak = Math.max(material.color.r, material.color.g, material.color.b)
+  if (peak > 0) material.color.multiplyScalar(1 / peak)
+}
+
 // The player model for one class/gender: the matching rigged .glb, rendered in
 // its bind pose (the packs' animation clips go unused) so the character just
 // stands there.
-function RiggedCharacterModel({ asset, skinColor }: { asset: ClassAsset; skinColor: string }) {
+function RiggedCharacterModel({
+  asset,
+  skinColor,
+  shirtColor,
+}: {
+  asset: ClassAsset
+  skinColor: string
+  shirtColor: string
+}) {
   const { scene } = useGLTF(asset.glb)
 
   const fitted = useMemo(() => {
@@ -204,7 +239,13 @@ function RiggedCharacterModel({ asset, skinColor }: { asset: ClassAsset; skinCol
       const isSkin =
         (asset.skinMaterial !== undefined && source.name === asset.skinMaterial) ||
         (asset.skinMesh !== undefined && child.name.includes(asset.skinMesh))
+      const isShirt =
+        (asset.shirtMaterial !== undefined && source.name === asset.shirtMaterial) ||
+        (asset.shirtMeshes?.includes(child.name) ?? false)
+      // Skin wins where the two overlap: on the men's models the shirt meshes
+      // are whole bodies, and their face must stay the skin color.
       if (isSkin) material.color.set(skinColor)
+      else if (isShirt) applyShirtTint(material, shirtColor)
       else if (asset.recolor?.[source.name]) material.color.set(asset.recolor[source.name])
       child.material = material
     })
@@ -215,7 +256,7 @@ function RiggedCharacterModel({ asset, skinColor }: { asset: ClassAsset; skinCol
     if (asset.weapon === 'staff') attachWeapon(clone, buildStaff(asset.staffOrbColor ?? '#8be3ff'), true)
 
     return clone
-  }, [scene, skinColor, asset])
+  }, [scene, skinColor, shirtColor, asset])
 
   return <primitive object={fitted} />
 }
@@ -239,11 +280,20 @@ export function CharacterModel({ appearance }: { appearance: CharacterAppearance
   const gender = appearance.gender ?? DEFAULT_GENDER
   const skinColor = appearance.skinColor ?? SKIN_FALLBACK_COLOR
   const asset = CHARACTER_ASSETS[gender][appearance.characterClass]
-  const fallback = <ProceduralCharacterModel skinColor={skinColor} gender={gender} />
+  // No pick yet: the real model keeps the color its outfit ships in, and the
+  // placeholder (which has no outfit of its own) keeps its robe brown.
+  const shirtColor = appearance.shirtColor ?? asset.defaultShirtColor
+  const fallback = (
+    <ProceduralCharacterModel
+      skinColor={skinColor}
+      shirtColor={appearance.shirtColor ?? ROBE_COLOR}
+      gender={gender}
+    />
+  )
   return (
     <ModelErrorBoundary key={`${appearance.characterClass}-${gender}`} fallback={fallback}>
       <Suspense fallback={fallback}>
-        <RiggedCharacterModel asset={asset} skinColor={skinColor} />
+        <RiggedCharacterModel asset={asset} skinColor={skinColor} shirtColor={shirtColor} />
       </Suspense>
     </ModelErrorBoundary>
   )

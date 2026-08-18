@@ -18,3 +18,18 @@ export const GENDER_OPTIONS: { id: CharacterGender; label: string }[] = [
 ]
 
 export const SKIN_COLOR_OPTIONS = ['#ffdbac', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5a3825']
+
+// The outfit palette, kept apart from the skin one so the two pickers can
+// never dress a character in a skin tone (or paint a face green). A null
+// shirt color means "leave the outfit the color it ships in" — see
+// defaultShirtColor in characterAssets.ts.
+export const SHIRT_COLOR_OPTIONS = [
+  '#b23b3b',
+  '#c9762a',
+  '#c9a227',
+  '#3f7a4a',
+  '#2f6fa8',
+  '#6b4fa0',
+  '#e9e1cd',
+  '#3a3f4a',
+]

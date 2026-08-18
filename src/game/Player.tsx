@@ -38,6 +38,7 @@ export function Player({
   const characterClass = useGameStore((s) => s.characterClass) ?? DEFAULT_CHARACTER_CLASS
   const gender = useGameStore((s) => s.gender)
   const skinColor = useGameStore((s) => s.skinColor)
+  const shirtColor = useGameStore((s) => s.shirtColor)
 
   useFrame((_, delta) => {
     const state = useGameStore.getState()
@@ -104,7 +105,7 @@ export function Player({
         decay={LIGHT_DECAY}
       />
       <group ref={modelGroup}>
-        <CharacterModel appearance={{ characterClass, gender, skinColor }} />
+        <CharacterModel appearance={{ characterClass, gender, skinColor, shirtColor }} />
       </group>
     </group>
   )

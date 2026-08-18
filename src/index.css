@@ -1914,6 +1914,7 @@ canvas {
 
 .swatch-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -1923,6 +1924,15 @@ canvas {
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
+}
+
+/* "Back to the outfit's own color" — a swatch of that color, marked with a
+   reset glyph so it reads as the default rather than as one more pick. */
+.swatch-default {
+  color: var(--parchment-text);
+  font-size: 15px;
+  line-height: 1;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
 }
 
 .swatch-active {

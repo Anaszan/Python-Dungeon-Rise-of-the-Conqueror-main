@@ -30,6 +30,7 @@ export function CombatOverlay() {
   const characterClass = useGameStore((s) => s.characterClass) ?? DEFAULT_CHARACTER_CLASS
   const gender = useGameStore((s) => s.gender)
   const skinColor = useGameStore((s) => s.skinColor)
+  const shirtColor = useGameStore((s) => s.shirtColor)
   const damageMonster = useGameStore((s) => s.damageMonster)
   const startSkillCooldown = useGameStore((s) => s.startSkillCooldown)
   const startAttackCooldown = useGameStore((s) => s.startAttackCooldown)
@@ -133,7 +134,7 @@ export function CombatOverlay() {
             className={`battle-sprite battle-sprite-player${playerHit ? ' recoil' : ''}${monsterHit ? ' lunge' : ''}`}
           >
             <div className="battle-platform" />
-            <CharacterPortrait appearance={{ characterClass, gender, skinColor }} view="back" />
+            <CharacterPortrait appearance={{ characterClass, gender, skinColor, shirtColor }} view="back" />
           </div>
 
           <div className="battle-info battle-info-player">

@@ -24,6 +24,19 @@ export type ClassAsset = {
   // so there a mesh name selects the bare face and nothing else.
   skinMaterial?: string
   skinMesh?: string
+  // Which surface follows the player's chosen shirt color — the same
+  // material-name / mesh-name split as the skin fields above, and for the same
+  // reason. On the women's packs one flat material is the garment, so the
+  // swatch lands on the shirt (or robe/cloak) alone. The men's models put
+  // their whole outfit in a single texture-painted mesh, so there the tint
+  // covers the outfit as a set — arms and boots included, since the mesh gives
+  // no way to separate them. Names are as GLTFLoader exposes them, i.e. with
+  // dots stripped ('ShoulderPad.R' in the file -> 'ShoulderPadR' here).
+  shirtMaterial?: string
+  shirtMeshes?: string[]
+  // The color the outfit already ships in, used until the player picks a
+  // shirt color. '#ffffff' leaves a texture-painted model untinted.
+  defaultShirtColor: string
   // Material name (from the .glb) -> replacement color, for reusing one
   // outfit across two classes.
   recolor?: Record<string, string>
@@ -38,25 +51,64 @@ export type ClassAsset = {
 // same character.
 export const CHARACTER_ASSETS: Record<CharacterGender, Record<CharacterClass, ClassAsset>> = {
   male: {
-    warrior: { glb: '/models/warrior/Warrior.glb', skinMesh: 'Face' },
-    cleric: { glb: '/models/cleric/Cleric.glb', skinMesh: 'Head' },
-    wizard: { glb: '/models/wizard/Wizard.glb', skinMesh: 'Face' },
-    rogue: { glb: '/models/rogue/Rogue.glb', skinMesh: 'Face' },
+    warrior: {
+      glb: '/models/warrior/Warrior.glb',
+      skinMesh: 'Face',
+      shirtMeshes: ['Warrior_Body', 'ShoulderPadR', 'ShoulderPadL'],
+      defaultShirtColor: '#ffffff',
+    },
+    cleric: {
+      glb: '/models/cleric/Cleric.glb',
+      skinMesh: 'Head',
+      shirtMeshes: ['Cleric', 'ShoulderPads'],
+      defaultShirtColor: '#ffffff',
+    },
+    wizard: {
+      glb: '/models/wizard/Wizard.glb',
+      skinMesh: 'Face',
+      shirtMeshes: ['Wizard', 'ShoulderPadL', 'ShoulderPadR', 'Pouch'],
+      defaultShirtColor: '#ffffff',
+    },
+    rogue: {
+      glb: '/models/rogue/Rogue.glb',
+      skinMesh: 'Face',
+      shirtMeshes: ['Rogue', 'Guard', 'Belt', 'Pouch'],
+      defaultShirtColor: '#ffffff',
+    },
   },
   female: {
-    warrior: { glb: '/models/female/HoodedAdventurer.glb', skinMaterial: 'Skin' },
-    rogue: { glb: '/models/female/Adventurer.glb', skinMaterial: 'Skin', weapon: 'dagger' },
+    warrior: {
+      glb: '/models/female/HoodedAdventurer.glb',
+      skinMaterial: 'Skin',
+      // Her hood and cloak share one material; the black tunic and leggings
+      // underneath stay put so the outfit keeps its shading.
+      shirtMaterial: 'DarkBrown',
+      defaultShirtColor: '#492e18',
+    },
+    rogue: {
+      glb: '/models/female/Adventurer.glb',
+      skinMaterial: 'Skin',
+      shirtMaterial: 'LightGreen',
+      defaultShirtColor: '#595236',
+      weapon: 'dagger',
+    },
     wizard: {
       glb: '/models/female/Witch.glb',
       skinMaterial: 'Skin',
+      // The robe, hat and skirt are one material on this mesh.
+      shirtMaterial: 'Purple',
+      defaultShirtColor: '#421968',
       weapon: 'staff',
       staffOrbColor: '#8be3ff',
     },
     cleric: {
       glb: '/models/female/Witch.glb',
       skinMaterial: 'Skin',
+      shirtMaterial: 'Purple',
+      // Same mesh as the wizard, so the cleric's robe starts cream instead of
+      // purple (plus the trim recolors below) to keep the two apart.
+      defaultShirtColor: '#e9e1cd',
       recolor: {
-        Purple: '#e9e1cd',
         Gold: '#c9a227',
         Brown2: '#7c6a48',
         Hair_Black: '#7a5230',

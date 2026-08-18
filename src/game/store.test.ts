@@ -138,13 +138,19 @@ describe('useGameStore', () => {
     expect(useGameStore.getState().phase).toBe('gameover')
   })
 
-  it('confirmCharacter stores the chosen class, gender, skin, and name', () => {
-    useGameStore.getState().confirmCharacter('wizard', 'female', '#abcdef', 'Gandalf')
+  it('confirmCharacter stores the chosen class, gender, skin, shirt, and name', () => {
+    useGameStore.getState().confirmCharacter('wizard', 'female', '#abcdef', '#123456', 'Gandalf')
     const s = useGameStore.getState()
     expect(s.characterClass).toBe('wizard')
     expect(s.gender).toBe('female')
     expect(s.skinColor).toBe('#abcdef')
+    expect(s.shirtColor).toBe('#123456')
     expect(s.characterName).toBe('Gandalf')
+  })
+
+  it('confirmCharacter keeps a null shirt color, leaving the outfit its own', () => {
+    useGameStore.getState().confirmCharacter('cleric', 'female', '#abcdef', null, 'Sera')
+    expect(useGameStore.getState().shirtColor).toBeNull()
   })
 
   it('hydrateSave derives the exam phase from a save whose level has no monsters left', () => {
@@ -158,6 +164,7 @@ describe('useGameStore', () => {
       characterClass: 'wizard',
       gender: 'male',
       skinColor: DEFAULT_SKIN_COLOR,
+      shirtColor: null,
       characterName: 'Rin',
     })
     const s = useGameStore.getState()
@@ -176,6 +183,7 @@ describe('useGameStore', () => {
       characterClass: 'rogue',
       gender: 'female',
       skinColor: DEFAULT_SKIN_COLOR,
+      shirtColor: null,
       characterName: 'Shade',
     })
     const s = useGameStore.getState()
@@ -195,6 +203,7 @@ describe('useGameStore', () => {
       characterClass: null,
       gender: DEFAULT_GENDER,
       skinColor: DEFAULT_SKIN_COLOR,
+      shirtColor: null,
       characterName: null,
     })
     expect(useGameStore.getState().phase).toBe('exploring')
@@ -210,7 +219,7 @@ describe('useGameStore', () => {
   })
 
   it('restart resets progress but keeps the chosen character, and clears any stuck pause', () => {
-    useGameStore.getState().confirmCharacter('cleric', 'female', '#111111', 'Elora')
+    useGameStore.getState().confirmCharacter('cleric', 'female', '#111111', '#222222', 'Elora')
     useGameStore.setState({ currentLevel: 3, playerHp: 10, paused: true })
 
     useGameStore.getState().restart()
@@ -225,7 +234,7 @@ describe('useGameStore', () => {
   })
 
   it('resetSave clears the chosen character and any stuck pause', () => {
-    useGameStore.getState().confirmCharacter('cleric', 'female', '#111111', 'Elora')
+    useGameStore.getState().confirmCharacter('cleric', 'female', '#111111', '#222222', 'Elora')
     useGameStore.setState({ paused: true })
 
     useGameStore.getState().resetSave()

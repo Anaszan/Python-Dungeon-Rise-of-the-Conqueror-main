@@ -48,6 +48,10 @@ type GameState = {
   characterClass: CharacterClass | null
   gender: CharacterGender
   skinColor: string
+  // null = never picked one, so the outfit keeps the color its model ships in
+  // (see defaultShirtColor in characterAssets.ts). That's also what every save
+  // written before migrations_009 loads as.
+  shirtColor: string | null
   characterName: string | null
   saveLoaded: boolean
   // Mid-game pause: freezes player movement, the combat attack timer, and
@@ -74,6 +78,7 @@ type GameState = {
     characterClass: CharacterClass,
     gender: CharacterGender,
     skinColor: string,
+    shirtColor: string | null,
     characterName: string,
   ) => void
   hydrateSave: (save: SaveData) => void
@@ -94,6 +99,7 @@ function persist() {
     characterClass,
     gender,
     skinColor,
+    shirtColor,
     characterName,
   } = useGameStore.getState()
   saveProgress(userId, {
@@ -106,6 +112,7 @@ function persist() {
     characterClass,
     gender,
     skinColor,
+    shirtColor,
     characterName,
   })
 }
@@ -126,6 +133,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   characterClass: null,
   gender: DEFAULT_GENDER,
   skinColor: DEFAULT_SKIN_COLOR,
+  shirtColor: null,
   characterName: null,
   saveLoaded: false,
   paused: false,
@@ -267,8 +275,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setPaused: (paused) => set({ paused }),
 
-  confirmCharacter: (characterClass, gender, skinColor, characterName) => {
-    set({ characterClass, gender, skinColor, characterName })
+  confirmCharacter: (characterClass, gender, skinColor, shirtColor, characterName) => {
+    set({ characterClass, gender, skinColor, shirtColor, characterName })
     persist()
   },
 
@@ -298,6 +306,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       characterClass: save.characterClass,
       gender: save.gender,
       skinColor: save.skinColor,
+      shirtColor: save.shirtColor,
       characterName: save.characterName,
       saveLoaded: true,
     })
@@ -342,6 +351,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       characterClass: null,
       gender: DEFAULT_GENDER,
       skinColor: DEFAULT_SKIN_COLOR,
+      shirtColor: null,
       characterName: null,
       saveLoaded: false,
       paused: false,
