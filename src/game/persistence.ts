@@ -117,7 +117,9 @@ export async function loadSave(userId: string): Promise<SaveData> {
   }
 }
 
-export async function saveProgress(userId: string, save: SaveData) {
+// Returns whether the write landed, for the one caller that shows the player
+// an answer (changing their character from the profile screen).
+export async function saveProgress(userId: string, save: SaveData): Promise<boolean> {
   const row = {
     user_id: userId,
     defeated_monster_ids: save.defeatedMonsterIds,
@@ -148,6 +150,7 @@ export async function saveProgress(userId: string, save: SaveData) {
   // store, so a failed write is worth reporting but not worth interrupting
   // play for — unlike a failed *read*, which loses a character (see loadSave).
   if (error) console.error('Failed to save progress:', error.message)
+  return !error
 }
 
 // Lets CharacterCustomize show a friendly "already taken" error while the

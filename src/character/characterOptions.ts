@@ -1,6 +1,17 @@
 export type CharacterClass = 'warrior' | 'cleric' | 'wizard' | 'rogue'
 export type CharacterGender = 'male' | 'female'
 
+// Everything about a character the player is free to change afterwards, which
+// is everything except the name — that is claimed once, when the character is
+// created, and is the one part of them another player can collide with (see
+// game/characterName.ts).
+export type AppearanceChoice = {
+  characterClass: CharacterClass
+  gender: CharacterGender
+  skinColor: string
+  shirtColor: string | null
+}
+
 export const DEFAULT_CHARACTER_CLASS: CharacterClass = 'warrior'
 export const DEFAULT_GENDER: CharacterGender = 'male'
 export const DEFAULT_SKIN_COLOR = '#e0b48a'

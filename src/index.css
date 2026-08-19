@@ -2110,8 +2110,16 @@ canvas {
 .profile-editor-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 8px;
+}
+
+/* Changing your character sits between who you are and how far you have got,
+   so it gets a rule above it to separate it from the progress bars below. */
+.profile-appearance {
+  border-top: 1px solid var(--gold-dim);
+  padding-top: 16px;
 }
 
 .profile-save-btn {

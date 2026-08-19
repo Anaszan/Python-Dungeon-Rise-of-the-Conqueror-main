@@ -16,7 +16,9 @@ vi.mock('../auth/authStore', () => ({
   useAuthStore: { getState: () => ({ session: { user: { id: 'test-user' } } }) },
 }))
 vi.mock('./persistence', () => ({
-  saveProgress: vi.fn(),
+  // Mirrors the real signature: callers that wait on it are told the write
+  // landed.
+  saveProgress: vi.fn(() => Promise.resolve(true)),
   submitScore: vi.fn(),
 }))
 
@@ -27,6 +29,20 @@ function defeatAllMonstersInLevel(levelIndex: number) {
   const ids = LEVELS[levelIndex].monsters.map((m) => m.id)
   useGameStore.setState({ defeatedIds: new Set(ids) })
   return ids
+}
+
+const loadedSave = {
+  defeatedMonsterIds: ['slime-1'],
+  playerHp: 120,
+  attackPower: BASE_ATTACK_POWER,
+  collectedPickupIds: [],
+  currentLevel: 2,
+  skillCooldown: 0,
+  characterClass: 'wizard' as const,
+  gender: DEFAULT_GENDER,
+  skinColor: DEFAULT_SKIN_COLOR,
+  shirtColor: null,
+  characterName: 'Rin',
 }
 
 describe('useGameStore', () => {
@@ -40,20 +56,6 @@ describe('useGameStore', () => {
   // player — level 1, no character — and the first thing that touched the
   // store would write that over hours of real progress.
   describe('writing back to Supabase', () => {
-    const loadedSave = {
-      defeatedMonsterIds: ['slime-1'],
-      playerHp: 120,
-      attackPower: BASE_ATTACK_POWER,
-      collectedPickupIds: [],
-      currentLevel: 2,
-      skillCooldown: 0,
-      characterClass: 'wizard' as const,
-      gender: DEFAULT_GENDER,
-      skinColor: DEFAULT_SKIN_COLOR,
-      shirtColor: null,
-      characterName: 'Rin',
-    }
-
     it('writes nothing until this account’s own save has been read', () => {
       useGameStore.getState().damagePlayer(10)
       useGameStore.getState().healPlayer(5)
@@ -196,6 +198,43 @@ describe('useGameStore', () => {
   it('confirmCharacter keeps a null shirt color, leaving the outfit its own', () => {
     useGameStore.getState().confirmCharacter('cleric', 'female', '#abcdef', null, 'Sera')
     expect(useGameStore.getState().shirtColor).toBeNull()
+  })
+
+  // Editing from the profile screen. The name is not part of an appearance:
+  // it was claimed against every other player at creation, and changing it
+  // would have to be claimed all over again.
+  describe('updateAppearance', () => {
+    const newLook = {
+      characterClass: 'rogue' as const,
+      gender: 'male' as const,
+      skinColor: '#8d5524',
+      shirtColor: '#2f6fa8',
+    }
+
+    it('changes the whole look and leaves the claimed name alone', async () => {
+      useGameStore.getState().hydrateSave(loadedSave)
+
+      await useGameStore.getState().updateAppearance(newLook)
+
+      const s = useGameStore.getState()
+      expect(s.characterClass).toBe('rogue')
+      expect(s.gender).toBe('male')
+      expect(s.skinColor).toBe('#8d5524')
+      expect(s.shirtColor).toBe('#2f6fa8')
+      expect(s.characterName).toBe('Rin')
+    })
+
+    it('reports back whether the new look actually reached Supabase', async () => {
+      // Nothing is written before this account's save has been read, and the
+      // profile screen is told so rather than showing a false "saved".
+      expect(await useGameStore.getState().updateAppearance(newLook)).toBe(false)
+
+      useGameStore.getState().hydrateSave(loadedSave)
+      expect(await useGameStore.getState().updateAppearance(newLook)).toBe(true)
+
+      vi.mocked(saveProgress).mockResolvedValueOnce(false)
+      expect(await useGameStore.getState().updateAppearance(newLook)).toBe(false)
+    })
   })
 
   it('hydrateSave derives the exam phase from a save whose level has no monsters left', () => {

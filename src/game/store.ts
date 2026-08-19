@@ -6,6 +6,7 @@ import { PLAYER_MAX_HP, BASE_ATTACK_POWER, SKILL_COOLDOWN_SECONDS, ATTACK_COOLDO
 import {
   DEFAULT_GENDER,
   DEFAULT_SKIN_COLOR,
+  type AppearanceChoice,
   type CharacterClass,
   type CharacterGender,
 } from '../character/characterOptions'
@@ -81,18 +82,26 @@ type GameState = {
     shirtColor: string | null,
     characterName: string,
   ) => void
+  // Editing an existing character from the profile screen. Deliberately does
+  // not touch characterName: that one is claimed at creation and is the only
+  // part of a character another player can collide with.
+  updateAppearance: (appearance: AppearanceChoice) => Promise<boolean>
   hydrateSave: (save: SaveData) => void
   resetSave: () => void
   restart: () => void
 }
 
-function persist() {
+// Resolves to whether the write landed. Almost every caller fires this and
+// forgets: progress is written after nearly every action, the store keeps its
+// own copy, and the next action will write again. updateAppearance is the
+// exception — it is a button the player pressed once, so it waits and says.
+async function persist(): Promise<boolean> {
   const userId = useAuthStore.getState().session?.user.id
-  if (!userId) return
+  if (!userId) return false
   // Nothing is written until this account's own save has been read back. The
   // state before that is placeholder — level 1, full HP, no character — and
   // writing it would overwrite a real save with a blank one.
-  if (!useGameStore.getState().saveLoaded) return
+  if (!useGameStore.getState().saveLoaded) return false
   const {
     defeatedIds,
     playerHp,
@@ -106,7 +115,7 @@ function persist() {
     shirtColor,
     characterName,
   } = useGameStore.getState()
-  saveProgress(userId, {
+  return saveProgress(userId, {
     defeatedMonsterIds: [...defeatedIds],
     playerHp,
     attackPower,
@@ -282,6 +291,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   confirmCharacter: (characterClass, gender, skinColor, shirtColor, characterName) => {
     set({ characterClass, gender, skinColor, shirtColor, characterName })
     persist()
+  },
+
+  updateAppearance: (appearance) => {
+    set(appearance)
+    return persist()
   },
 
   hydrateSave: (save) => {
