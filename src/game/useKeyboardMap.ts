@@ -18,6 +18,14 @@ const KEY_MAP: Record<string, keyof MoveState> = {
   ArrowRight: 'right',
 }
 
+// Whether this key is one of the ones that walks the player. Shared with the
+// touch joystick, which puts itself away when the keyboard is doing the
+// walking — the two have to agree on which keys those are, or the stick would
+// vanish on a key that moves nobody.
+export function isMovementKey(code: string) {
+  return Object.hasOwn(KEY_MAP, code)
+}
+
 export function useKeyboardMap() {
   const state = useRef<MoveState>({
     forward: false,
