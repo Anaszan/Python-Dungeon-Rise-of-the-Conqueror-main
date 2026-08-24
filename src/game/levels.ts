@@ -3,11 +3,59 @@ import { WALL_THICKNESS } from './dungeon'
 import { ATTACK_PICKUP_AMOUNT, PLAYER_MAX_HP } from './constants'
 import type { MonsterData } from './monsters'
 import type { PickupData } from './pickups'
+import type { LevelTheme } from './levelTheme'
+import {
+  ARCANE_TOWER_THEME,
+  ARENA_THEME,
+  CATACOMBS_THEME,
+  DARK_CORRIDOR_THEME,
+  GLITCH_THEME,
+  LIBRARY_THEME,
+} from './levelTheme'
+
+// The set of props a level can stand on its floor. Each one is a component in
+// DungeonProps.tsx, wired up by kind in GameScene. Grouped by the level they
+// were built for, though nothing stops a level borrowing another's prop —
+// ด่าน 6's ruined knights are ด่าน 1's statues in a colder colour, and the
+// catacombs' wisps come back in the vault of the tower.
+export type DecorationKind =
+  // ด่าน 1 — ทางเดินมืด
+  | 'torch'
+  | 'statue'
+  | 'chest'
+  | 'bones'
+  // ด่าน 2 — ห้องใต้ดินที่ลึกกว่าเดิม
+  | 'wisp'
+  | 'coffin'
+  // ด่าน 3 — สนามประลองคอมโบ
+  | 'brazier'
+  | 'cage'
+  // ด่าน 4 — หอคาถาต้องมนตร์
+  | 'runeCircle'
+  | 'crystal'
+  | 'tome'
+  // ด่าน 5 — หอสมุดลับ
+  | 'bookshelf'
+  | 'desk'
+  // ด่าน 6 — ดันเจี้ยนกับดักมรณะ
+  | 'spikeTrap'
+  | 'rift'
+  | 'rubble'
 
 export type DecorationData = {
-  kind: 'torch' | 'statue' | 'chest'
+  kind: DecorationKind
   position: [number, number, number]
+  // Radians; turns a prop to face into the room it stands in.
+  rotationY?: number
+  // Overrides the prop's default colour — an arcane torch burning violet, a
+  // cursed crystal burning black-purple.
+  color?: string
 }
+
+// Props that carry a real light and so can be navigated by. The rest either
+// glow through unlit additive material (runeCircle, tome, chest) — visible,
+// but lighting nothing around them — or don't glow at all.
+export const LIGHT_DECORATION_KINDS: DecorationKind[] = ['torch', 'wisp', 'brazier', 'crystal', 'desk', 'rift']
 
 export type LevelData = {
   level: number
@@ -18,6 +66,10 @@ export type LevelData = {
   monsters: MonsterData[]
   pickups: PickupData[]
   decorations?: DecorationData[]
+  // Palette, fog and airborne motes for this level — the reason ด่าน 5 reads
+  // as a wooden library and ด่าน 3 as a sunlit arena even where they reuse an
+  // earlier level's floor plan. See levelTheme.ts.
+  theme: LevelTheme
   // Optional art: drop an image under public/textures and point these at its
   // URL (e.g. "/textures/level1-floor.png") to replace the placeholder floor
   // color / grid and wall color with real map art. Left unset, levels render
@@ -98,6 +150,8 @@ const LEVEL_1_PICKUPS: PickupData[] = [
   { id: 'potion-1', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -10] },
 ]
 
+// Guttering torches down a wet stone corridor, and a dragon's nest at the end
+// of it: bones on the floor of the last room, statues flanking the chest.
 const LEVEL_1_DECORATIONS: DecorationData[] = [
   { kind: 'torch', position: [-1.8, 0, -2] },
   { kind: 'torch', position: [1.8, 0, -2] },
@@ -112,6 +166,10 @@ const LEVEL_1_DECORATIONS: DecorationData[] = [
   { kind: 'statue', position: [-5, 0, -38.5] },
   { kind: 'statue', position: [5, 0, -38.5] },
   { kind: 'chest', position: [0, 0, -38] },
+  // the nest itself
+  { kind: 'bones', position: [-1.5, 0, -35.5], rotationY: 0.6 },
+  { kind: 'bones', position: [2.2, 0, -39], rotationY: -1.1 },
+  { kind: 'bones', position: [5.5, 0, -35.2], rotationY: 2.2 },
 ]
 
 export const LEVEL_1: LevelData = {
@@ -123,6 +181,7 @@ export const LEVEL_1: LevelData = {
   monsters: LEVEL_1_MONSTERS,
   pickups: LEVEL_1_PICKUPS,
   decorations: LEVEL_1_DECORATIONS,
+  theme: DARK_CORRIDOR_THEME,
 }
 
 // Level 2: a longer corridor with a west room and an east room (both bigger
@@ -202,21 +261,51 @@ const LEVEL_2_PICKUPS: PickupData[] = [
   { id: 'potion-2', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -12] },
 ]
 
+// Two torches at the stair down from ด่าน 1 and then no fire at all: past the
+// entrance the catacombs are lit only by wisps, which are a third the reach of
+// a torch, so the corridor is a chain of small drifting pools of green light
+// with stone coffins standing at the edge of them. The goblin/orc camps in the
+// side rooms are the exception — they burn a brazier, the one bright thing
+// down here, which is also what tells the player a room is occupied before
+// they walk into it.
 const LEVEL_2_DECORATIONS: DecorationData[] = [
   { kind: 'torch', position: [-1.8, 0, -2] },
   { kind: 'torch', position: [1.8, 0, -2] },
-  { kind: 'torch', position: [-1.8, 0, -22] },
-  { kind: 'torch', position: [1.8, 0, -32] },
-  { kind: 'torch', position: [-1.8, 0, -36] },
-  { kind: 'torch', position: [1.8, 0, -36] },
-  { kind: 'torch', position: [-4, 0, -8.5] },
-  { kind: 'torch', position: [-4, 0, -16.5] },
-  { kind: 'torch', position: [4, 0, -20.5] },
-  { kind: 'torch', position: [4, 0, -28.5] },
+
+  // main corridor: coffins alternating along both walls
+  { kind: 'coffin', position: [-1.42, 0, -7] },
+  { kind: 'coffin', position: [1.42, 0, -11] },
+  { kind: 'coffin', position: [-1.42, 0, -16] },
+  { kind: 'coffin', position: [1.42, 0, -24] },
+  { kind: 'coffin', position: [-1.42, 0, -30] },
+  { kind: 'coffin', position: [1.42, 0, -37] },
+  { kind: 'wisp', position: [0.6, 1.4, -9] },
+  { kind: 'wisp', position: [-0.8, 1.2, -21] },
+  { kind: 'wisp', position: [0.7, 1.5, -28] },
+  { kind: 'wisp', position: [-0.6, 1.3, -40] },
+
+  // west room — orc camp in a collapsed underground street
+  { kind: 'brazier', position: [-3.4, 0, -15] },
+  { kind: 'bones', position: [-8, 0, -10], rotationY: 0.8 },
+  { kind: 'coffin', position: [-8.4, 0, -12.5], rotationY: Math.PI / 2 },
+
+  // east room — the same, on the other side of the corridor
+  { kind: 'brazier', position: [3.4, 0, -27] },
+  { kind: 'bones', position: [8, 0, -22], rotationY: -0.5 },
+  { kind: 'wisp', position: [5.5, 1.4, -25.5] },
+
+  // end room — altar hall with the bones of an ancient dragon in it
   { kind: 'statue', position: [-6, 0, -46.5] },
   { kind: 'statue', position: [6, 0, -46.5] },
-  { kind: 'torch', position: [-8, 0, -44] },
-  { kind: 'chest', position: [-10, 0, -45] },
+  { kind: 'coffin', position: [0, 0, -47], rotationY: Math.PI / 2 },
+  { kind: 'bones', position: [-2.5, 0, -43.5], rotationY: 1.4 },
+  { kind: 'bones', position: [2.2, 0, -47.4], rotationY: -0.9 },
+  { kind: 'wisp', position: [-3, 1.6, -44.5] },
+  { kind: 'wisp', position: [3.4, 1.3, -44] },
+
+  // vault — spirit haze circling the old treasury
+  { kind: 'chest', position: [-11.8, 0, -46] },
+  { kind: 'wisp', position: [-9, 1.3, -46] },
 ]
 
 export const LEVEL_2: LevelData = {
@@ -228,6 +317,7 @@ export const LEVEL_2: LevelData = {
   monsters: LEVEL_2_MONSTERS,
   pickups: LEVEL_2_PICKUPS,
   decorations: LEVEL_2_DECORATIONS,
+  theme: CATACOMBS_THEME,
 }
 
 // Levels 3-6 intentionally reuse LEVEL_1's and LEVEL_2's region/wall
@@ -238,6 +328,12 @@ export const LEVEL_2: LevelData = {
 // through the 3D scene to verify new geometry visually in this environment
 // — reusing a known-good shape keeps that risk at zero. Monsters, pickups,
 // names and difficulty are new per level.
+//
+// What the shared footprint costs is that two levels could feel like the same
+// room twice, so everything laid *on* that footprint is authored fresh: its
+// own theme (palette, fog, motes — levelTheme.ts) and its own props. A shared
+// floor plan under a sand floor, limestone walls, warm haze, fire bowls and
+// cages full of beasts does not read as the corridor it was traced from.
 
 // Level 3 — บทที่ 4 (การวนซ้ำ): same footprint as level 1.
 const LEVEL_3_REGIONS: Region[] = LEVEL_1_REGIONS
@@ -266,6 +362,46 @@ const LEVEL_3_PICKUPS: PickupData[] = [
   { id: 'potion-3', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -10] },
 ]
 
+// The colosseum. The corridor from ด่าน 1 becomes the run-in from the pens:
+// caged beasts along both walls, fire bowls between them. The side rooms are
+// the wings of the arena floor with the stands' columns at their backs, and
+// the end room is the pit itself — braziers on all four corners, the hydra's
+// leavings in the middle of it.
+const LEVEL_3_DECORATIONS: DecorationData[] = [
+  { kind: 'torch', position: [-1.8, 0, -1.5] },
+  { kind: 'torch', position: [1.8, 0, -1.5] },
+
+  // run-in from the pens
+  { kind: 'brazier', position: [1.4, 0, -6] },
+  { kind: 'cage', position: [-1.35, 0, -8.5] },
+  { kind: 'brazier', position: [-1.4, 0, -13] },
+  { kind: 'cage', position: [1.35, 0, -19] },
+  { kind: 'brazier', position: [1.4, 0, -24] },
+  { kind: 'cage', position: [-1.35, 0, -26] },
+  { kind: 'brazier', position: [-1.4, 0, -31] },
+  { kind: 'bones', position: [1.3, 0, -33], rotationY: 0.4 },
+
+  // west wing
+  { kind: 'brazier', position: [-3, 0, -12.2] },
+  { kind: 'cage', position: [-7.7, 0, -7.8] },
+  { kind: 'statue', position: [-7.7, 0, -12.2] },
+
+  // east wing
+  { kind: 'brazier', position: [3, 0, -22.2] },
+  { kind: 'cage', position: [7.7, 0, -17.8] },
+  { kind: 'statue', position: [7.7, 0, -22.2] },
+
+  // the pit
+  { kind: 'brazier', position: [-5.7, 0, -35] },
+  { kind: 'brazier', position: [5.7, 0, -35] },
+  { kind: 'brazier', position: [-5.7, 0, -39] },
+  { kind: 'brazier', position: [5.7, 0, -39] },
+  { kind: 'bones', position: [0, 0, -39], rotationY: 1.9 },
+  { kind: 'bones', position: [1.6, 0, -35.4], rotationY: -0.7 },
+  { kind: 'cage', position: [-6, 0, -37] },
+  { kind: 'cage', position: [6, 0, -37] },
+]
+
 export const LEVEL_3: LevelData = {
   level: 3,
   name: 'สนามประลองคอมโบ',
@@ -274,7 +410,8 @@ export const LEVEL_3: LevelData = {
   walls: LEVEL_3_WALLS,
   monsters: LEVEL_3_MONSTERS,
   pickups: LEVEL_3_PICKUPS,
-  decorations: LEVEL_1_DECORATIONS,
+  decorations: LEVEL_3_DECORATIONS,
+  theme: ARENA_THEME,
 }
 
 // Level 4 — บทที่ 5 (ฟังก์ชัน): same footprint as level 2 (has a vault room).
@@ -311,6 +448,56 @@ const LEVEL_4_PICKUPS: PickupData[] = [
   { id: 'potion-4', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -12] },
 ]
 
+// The tower. Sigils burn in the floor and walls of their own accord (that
+// part is in the theme's emissive maps, not here), so the props are what sits
+// on top of that: circles turning on the stair landings and hanging in the
+// stairwell itself, crystal clusters lighting the walls in place of fire,
+// grimoires drifting around the labs. Only the two torches at the door still
+// burn, and even those burn violet.
+const LEVEL_4_DECORATIONS: DecorationData[] = [
+  { kind: 'torch', position: [-1.8, 0, -2], color: '#9f7fff' },
+  { kind: 'torch', position: [1.8, 0, -2], color: '#9f7fff' },
+
+  // the spiral stair: circles on the landings, more hanging in the air above
+  { kind: 'runeCircle', position: [0, 0.05, -8] },
+  { kind: 'crystal', position: [-1.5, 0, -11] },
+  { kind: 'runeCircle', position: [0, 1.7, -15] },
+  { kind: 'tome', position: [-1.2, 1.4, -21] },
+  { kind: 'runeCircle', position: [0, 0.05, -24] },
+  { kind: 'crystal', position: [-1.5, 0, -27] },
+  { kind: 'tome', position: [1.2, 1.5, -29] },
+  { kind: 'runeCircle', position: [0, 1.9, -31] },
+  { kind: 'crystal', position: [1.5, 0, -35] },
+  { kind: 'runeCircle', position: [0, 0.05, -39] },
+
+  // west room — the ritual chamber
+  { kind: 'runeCircle', position: [-5.5, 0.05, -13] },
+  { kind: 'crystal', position: [-8.3, 0, -9.8] },
+  { kind: 'crystal', position: [-8.3, 0, -15.2] },
+  { kind: 'tome', position: [-3.6, 1.5, -14.6] },
+
+  // east room — the spell laboratory
+  { kind: 'runeCircle', position: [5.5, 0.05, -25.5] },
+  { kind: 'crystal', position: [8.3, 0, -21.8] },
+  { kind: 'crystal', position: [8.3, 0, -27.2] },
+  { kind: 'tome', position: [3.4, 1.4, -22] },
+  { kind: 'tome', position: [6.6, 1.7, -24.4] },
+
+  // the open summit: the Archmage's power circle, open to the stars
+  { kind: 'runeCircle', position: [0, 0.05, -45] },
+  { kind: 'tome', position: [0, 1.9, -45] },
+  { kind: 'statue', position: [-6, 0, -46.5], color: '#4a3f6a' },
+  { kind: 'statue', position: [6, 0, -46.5], color: '#4a3f6a' },
+  { kind: 'crystal', position: [-6.4, 0, -43] },
+  { kind: 'crystal', position: [6.4, 0, -43] },
+
+  // vault of cursed artifacts: the same crystals, gone black-violet
+  { kind: 'crystal', position: [-8.4, 0, -46.3], color: '#6a2fb5' },
+  // clear of the vault walls by more than the circle's own 1-unit radius
+  { kind: 'runeCircle', position: [-11.8, 0.05, -44.4], color: '#6a2fb5' },
+  { kind: 'chest', position: [-11.6, 0, -45.9] },
+]
+
 export const LEVEL_4: LevelData = {
   level: 4,
   name: 'หอคาถาต้องมนตร์',
@@ -319,7 +506,8 @@ export const LEVEL_4: LevelData = {
   walls: LEVEL_4_WALLS,
   monsters: LEVEL_4_MONSTERS,
   pickups: LEVEL_4_PICKUPS,
-  decorations: LEVEL_2_DECORATIONS,
+  decorations: LEVEL_4_DECORATIONS,
+  theme: ARCANE_TOWER_THEME,
 }
 
 // Level 5 — บทที่ 6 (การจัดการไฟล์): same footprint as level 1.
@@ -349,6 +537,49 @@ const LEVEL_5_PICKUPS: PickupData[] = [
   { id: 'potion-5', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -10] },
 ]
 
+// The library. Cases run down both walls of the corridor so the level-1
+// footprint reads as a canyon between shelves rather than a stone passage —
+// each is turned so its back is to the wall it stands against (rotationY of
+// ±90° along the corridor, 0 along the far wall of the end room). Nothing
+// burns in here but candles on the scribes' desks; the tome on its circle at
+// the heart of the library is the one other thing giving off light.
+const LEVEL_5_DECORATIONS: DecorationData[] = [
+  { kind: 'torch', position: [-1.8, 0, -1.5], color: '#ffcf8a' },
+  { kind: 'torch', position: [1.8, 0, -1.5], color: '#ffcf8a' },
+
+  // the stacks
+  { kind: 'bookshelf', position: [-1.82, 0, -4], rotationY: Math.PI / 2 },
+  { kind: 'bookshelf', position: [1.82, 0, -7], rotationY: -Math.PI / 2 },
+  { kind: 'bookshelf', position: [-1.82, 0, -10.5], rotationY: Math.PI / 2 },
+  { kind: 'bookshelf', position: [1.82, 0, -14], rotationY: -Math.PI / 2 },
+  { kind: 'bookshelf', position: [-1.82, 0, -18], rotationY: Math.PI / 2 },
+  { kind: 'bookshelf', position: [1.82, 0, -21.5], rotationY: -Math.PI / 2 },
+  { kind: 'bookshelf', position: [-1.82, 0, -26], rotationY: Math.PI / 2 },
+  { kind: 'bookshelf', position: [1.82, 0, -30], rotationY: -Math.PI / 2 },
+  { kind: 'desk', position: [1.2, 0, -24], rotationY: -Math.PI / 2 },
+  { kind: 'tome', position: [-0.9, 1.5, -13] },
+  { kind: 'tome', position: [0.9, 1.4, -32] },
+
+  // west reading room
+  { kind: 'desk', position: [-4.4, 0, -12], rotationY: Math.PI },
+  { kind: 'bookshelf', position: [-8.3, 0, -8.5], rotationY: Math.PI / 2 },
+  { kind: 'tome', position: [-5.6, 1.5, -10] },
+
+  // east reading room
+  { kind: 'desk', position: [4, 0, -21.8] },
+  { kind: 'bookshelf', position: [8.3, 0, -19.5], rotationY: -Math.PI / 2 },
+  { kind: 'tome', position: [6.2, 1.5, -18] },
+
+  // the heart of the library: the Forbidden Tome on its circle
+  { kind: 'runeCircle', position: [0, 0.06, -37.5], color: '#c9a24a' },
+  { kind: 'tome', position: [0, 1.5, -37.5], color: '#ffcf8a' },
+  { kind: 'bookshelf', position: [-4.5, 0, -39.6] },
+  { kind: 'bookshelf', position: [0, 0, -39.6] },
+  { kind: 'bookshelf', position: [4.5, 0, -39.6] },
+  { kind: 'desk', position: [-5.6, 0, -35.4], rotationY: 0.6 },
+  { kind: 'desk', position: [5.6, 0, -35.4], rotationY: -0.6 },
+]
+
 export const LEVEL_5: LevelData = {
   level: 5,
   name: 'หอสมุดลับ',
@@ -357,7 +588,8 @@ export const LEVEL_5: LevelData = {
   walls: LEVEL_5_WALLS,
   monsters: LEVEL_5_MONSTERS,
   pickups: LEVEL_5_PICKUPS,
-  decorations: LEVEL_1_DECORATIONS,
+  decorations: LEVEL_5_DECORATIONS,
+  theme: LIBRARY_THEME,
 }
 
 // Level 6 — บทที่ 7 (การจัดการข้อผิดพลาด): same footprint as level 2. Every
@@ -398,6 +630,54 @@ const LEVEL_6_PICKUPS: PickupData[] = [
   { id: 'potion-6', kind: 'attack', amount: ATTACK_PICKUP_AMOUNT, position: [0, 0.5, -12] },
 ]
 
+// The broken dungeon. Spike traps sit flush in the floor and are walked over
+// rather than around — they already fired, and half their spikes are snapped
+// off. What lights the place is the damage: rifts torn through the level that
+// stutter rather than burn, with chunks of the floor hanging in the air around
+// them. The knights in the side halls are ด่าน 1's statues drained to grey.
+const LEVEL_6_DECORATIONS: DecorationData[] = [
+  { kind: 'torch', position: [-1.8, 0, -2] },
+  { kind: 'torch', position: [1.8, 0, -2] },
+
+  // main corridor: jammed traps underfoot, tears in the air above
+  { kind: 'spikeTrap', position: [0, 0, -8] },
+  { kind: 'rift', position: [1.4, 1.1, -11] },
+  { kind: 'spikeTrap', position: [0, 0, -15] },
+  { kind: 'rubble', position: [-1.1, 1.4, -17.5] },
+  { kind: 'rift', position: [-1.4, 1.2, -22] },
+  { kind: 'spikeTrap', position: [0, 0, -26] },
+  { kind: 'rubble', position: [1.1, 1.5, -29] },
+  { kind: 'rift', position: [1.4, 1, -31] },
+  { kind: 'spikeTrap', position: [0, 0, -36] },
+  { kind: 'rift', position: [-1.3, 1.4, -39.5] },
+
+  // west hall — the fallen knights
+  { kind: 'statue', position: [-8.4, 0, -12.5], color: '#3c3c46' },
+  { kind: 'statue', position: [-2.9, 0, -15.3], color: '#3c3c46' },
+  { kind: 'spikeTrap', position: [-4, 0, -12.5] },
+  { kind: 'rubble', position: [-6.6, 1.4, -12.6] },
+
+  // east hall — the same mechanism room, further gone
+  { kind: 'statue', position: [8.4, 0, -24.5], color: '#3c3c46' },
+  { kind: 'spikeTrap', position: [3.4, 0, -26.5] },
+  { kind: 'rift', position: [4, 1.2, -21.8] },
+  { kind: 'rubble', position: [6.6, 1.5, -23.5] },
+
+  // the Glitch Wyrm's nest: the room itself is coming apart
+  { kind: 'rift', position: [-6, 1.3, -44] },
+  { kind: 'rift', position: [6, 1.3, -44] },
+  { kind: 'rift', position: [0, 1.7, -47.2] },
+  { kind: 'rubble', position: [-2.6, 1.5, -47.4] },
+  { kind: 'rubble', position: [3, 1.4, -43.2] },
+  { kind: 'spikeTrap', position: [0, 0, -43.4] },
+  { kind: 'bones', position: [1.4, 0, -47.4], rotationY: 0.9, color: '#7a7a86' },
+
+  // vault — the innermost mechanism, leaking power
+  { kind: 'rift', position: [-8.5, 1.1, -46], color: '#25f4d0' },
+  { kind: 'crystal', position: [-12.3, 0, -43.7], color: '#25f4d0' },
+  { kind: 'chest', position: [-11.6, 0, -46] },
+]
+
 export const LEVEL_6: LevelData = {
   level: 6,
   name: 'ดันเจี้ยนกับดักมรณะ',
@@ -406,7 +686,8 @@ export const LEVEL_6: LevelData = {
   walls: LEVEL_6_WALLS,
   monsters: LEVEL_6_MONSTERS,
   pickups: LEVEL_6_PICKUPS,
-  decorations: LEVEL_2_DECORATIONS,
+  decorations: LEVEL_6_DECORATIONS,
+  theme: GLITCH_THEME,
 }
 
 export const LEVELS: LevelData[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6]

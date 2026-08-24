@@ -6,9 +6,9 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { ALL_MONSTERS, LEVELS } from './levels'
+import { ALL_MONSTERS, LEVELS, LIGHT_DECORATION_KINDS } from './levels'
 import { LESSONS } from './lessons'
-import { canStandAt, hitsWall } from './dungeon'
+import { canStandAt, hitsWall, isWalkable } from './dungeon'
 import {
   ATTACK_PICKUP_AMOUNT,
   BASE_ATTACK_POWER,
@@ -96,6 +96,17 @@ describe('campaign', () => {
       if (!monster.imageUrl?.endsWith('.png')) continue
       expect(pngHasAlpha(publicPath(monster.imageUrl)), `${monster.name}: ${monster.imageUrl} has no alpha channel`).toBe(true)
     }
+  })
+
+  it('gives every level its own look, not just its own monsters', () => {
+    // Levels 3-6 reuse an earlier level's floor plan on purpose (see the note
+    // in levels.ts), so the theme and the prop list are the only things left
+    // keeping two levels from being the same room twice. A copy-pasted theme
+    // or decoration array is invisible until you walk into it.
+    const themeIds = LEVELS.map((l) => l.theme.id)
+    expect(new Set(themeIds).size, 'two levels share a theme').toBe(LEVELS.length)
+    const decorations = LEVELS.map((l) => JSON.stringify(l.decorations ?? []))
+    expect(new Set(decorations).size, 'two levels share a decoration list').toBe(LEVELS.length)
   })
 
   it('keeps pickup ids unique across every level', () => {
@@ -246,6 +257,17 @@ describe.each(LEVELS)('level $level ($name)', (level) => {
     expect(hitsWall(pickup.position[0], pickup.position[2], walls, 0)).toBe(false)
   })
 
+  it.each(level.decorations ?? [])('stands $kind on floor the level actually has', (deco) => {
+    // Props have no collision, so one placed off the floor plan doesn't break
+    // anything — it just hangs in the void, or sits inside a wall with only
+    // the half nobody can see poking out. Both are silent until someone walks
+    // that far into the level. Props are allowed to touch a wall (a bookcase
+    // has its back to one), which is why this tests the raw wall box with no
+    // margin rather than the player's clearance.
+    expect(isWalkable(deco.position[0], deco.position[2], regions), `${deco.kind} is off the floor plan`).toBe(true)
+    expect(hitsWall(deco.position[0], deco.position[2], walls, 0), `${deco.kind} is buried in a wall`).toBe(false)
+  })
+
   it('stocks a way to heal and a way to hit harder', () => {
     // HP carries across levels and never regenerates on its own, so a level
     // with no heal in it can only be survived on whatever the player walked
@@ -254,12 +276,16 @@ describe.each(LEVELS)('level $level ($name)', (level) => {
     expect(level.pickups.some((p) => p.kind === 'attack'), 'no attack pickup').toBe(true)
   })
 
-  it('is dark but navigable: it places torches, and the lantern outreaches the fight trigger', () => {
+  it('is dark but navigable: it places lights, and the lantern outreaches the fight trigger', () => {
     // The level itself is unlit (see GameScene) — the only light is the
-    // player's lantern and these. Without at least one torch a level has no
-    // landmark to navigate by at all.
-    const torches = (level.decorations ?? []).filter((d) => d.kind === 'torch')
-    expect(torches.length).toBeGreaterThan(0)
+    // player's lantern and whatever props it stands in the level. Which prop
+    // that is differs per level (a torch in ด่าน 1, a wisp in the catacombs, a
+    // brazier in the arena), but without at least one of them a level has no
+    // landmark to navigate by at all. Props that only glow through unlit
+    // additive material — a rune circle, a chest — light nothing around them
+    // and so don't count here.
+    const lights = (level.decorations ?? []).filter((d) => LIGHT_DECORATION_KINDS.includes(d.kind))
+    expect(lights.length).toBeGreaterThan(0)
     // And the lantern has to reach further than the distance at which a
     // monster starts a fight, or the player would be ambushed out of the dark
     // by something they never got to see.

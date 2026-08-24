@@ -8,21 +8,58 @@ import { IsoCamera } from './IsoCamera'
 import { Monster } from './Monster'
 import { Pickup } from './Pickup'
 import { CombatTicker } from './CombatTicker'
-import { Torch, Statue, TreasureChest } from './DungeonProps'
+import {
+  BonePile,
+  Bookshelf,
+  Brazier,
+  Cage,
+  Coffin,
+  Crystal,
+  FloatingRubble,
+  FloatingTome,
+  GlitchRift,
+  ReadingDesk,
+  RuneCircle,
+  SpikeTrap,
+  Statue,
+  Torch,
+  TreasureChest,
+  Wisp,
+} from './DungeonProps'
+import type { PropProps } from './DungeonProps'
+import type { DecorationKind } from './levels'
 import { LEVELS } from './levels'
 import { useGameStore } from './store'
-import {
-  COMBAT_TRIGGER_DISTANCE,
-  DUNGEON_AMBIENT_INTENSITY,
-  FLEE_CLEAR_DISTANCE,
-  PICKUP_TRIGGER_DISTANCE,
-} from './constants'
+import { COMBAT_TRIGGER_DISTANCE, FLEE_CLEAR_DISTANCE, PICKUP_TRIGGER_DISTANCE } from './constants'
+
+// Every prop takes the same props (see PropProps), so a level's decoration
+// list maps straight through this table — adding a prop kind is a new entry
+// here and a new component in DungeonProps, with no branch to touch.
+const DECORATION_COMPONENTS: Record<DecorationKind, (props: PropProps) => React.ReactElement> = {
+  torch: Torch,
+  statue: Statue,
+  chest: TreasureChest,
+  bones: BonePile,
+  wisp: Wisp,
+  coffin: Coffin,
+  brazier: Brazier,
+  cage: Cage,
+  runeCircle: RuneCircle,
+  crystal: Crystal,
+  tome: FloatingTome,
+  bookshelf: Bookshelf,
+  desk: ReadingDesk,
+  spikeTrap: SpikeTrap,
+  rift: GlitchRift,
+  rubble: FloatingRubble,
+}
 
 export function GameScene() {
   const playerPos = useRef(new THREE.Vector3(0, 0.6, 0))
   const phase = useGameStore((s) => s.phase)
   const currentLevel = useGameStore((s) => s.currentLevel)
   const levelData = LEVELS[currentLevel - 1]
+  const theme = levelData.theme
   const prevPhase = useRef(phase)
   const prevLevel = useRef(currentLevel)
 
@@ -95,10 +132,13 @@ export function GameScene() {
           fill — so a room the player has not walked into, and that has no
           torch of its own, renders as black as the void around it.
 
-          What is left is the background, painted black so unlit geometry has
-          nothing to sit against, a trace of ambient so a silhouette just
-          outside the lantern still reads rather than vanishing outright, and
-          fog to swallow the distance.
+          What is left is the background, painted the level's own darkness so
+          unlit geometry has nothing to sit against, a trace of ambient so a
+          silhouette just outside the lantern still reads rather than
+          vanishing outright, and fog to swallow the distance. All three are
+          per-level (levelTheme.ts): the catacombs' dark is green, the tower's
+          is violet, and the arena's is both warmer and further off, which is
+          what makes an open colosseum feel open.
 
           Fog is measured from the camera, not the player, and IsoCamera sits
           ~18 units back — so its near plane has to clear that plus the reach
@@ -107,13 +147,21 @@ export function GameScene() {
           one job it is here for: putting out torches on the far side of the
           level so a long corridor ends in darkness rather than in a row of
           visible flames. */}
-      <color attach="background" args={['#05040a']} />
-      <fog attach="fog" args={['#05040a', 26, 60]} />
-      <ambientLight intensity={DUNGEON_AMBIENT_INTENSITY} color="#6a7ba8" />
-      <Sparkles count={40} scale={[16, 4, 40]} size={2} speed={0.3} opacity={0.18} color="#ffd27a" />
+      <color attach="background" args={[theme.fog.color]} />
+      <fog attach="fog" args={[theme.fog.color, theme.fog.near, theme.fog.far]} />
+      <ambientLight intensity={theme.ambient.intensity} color={theme.ambient.color} />
+      <Sparkles
+        count={theme.motes.count}
+        scale={theme.motes.scale}
+        size={theme.motes.size}
+        speed={theme.motes.speed}
+        opacity={theme.motes.opacity}
+        color={theme.motes.color}
+      />
       <Ground
         regions={levelData.regions}
         walls={levelData.walls}
+        theme={theme}
         floorTextureUrl={levelData.floorTextureUrl}
         wallTextureUrl={levelData.wallTextureUrl}
       />
@@ -126,9 +174,8 @@ export function GameScene() {
         <Pickup key={pickup.id} data={pickup} />
       ))}
       {levelData.decorations?.map((deco, i) => {
-        if (deco.kind === 'torch') return <Torch key={i} position={deco.position} />
-        if (deco.kind === 'statue') return <Statue key={i} position={deco.position} />
-        return <TreasureChest key={i} position={deco.position} />
+        const Prop = DECORATION_COMPONENTS[deco.kind]
+        return <Prop key={i} position={deco.position} rotationY={deco.rotationY} color={deco.color} />
       })}
     </>
   )

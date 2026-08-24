@@ -52,9 +52,29 @@ export const LANTERN_RADIUS = 11
 export const LANTERN_INTENSITY = 18
 export const TORCH_RADIUS = 10
 export const TORCH_INTENSITY = 14
-// Just enough fill to read a silhouette a step outside the light rather than
-// nothing at all. Raising this washes the darkness out fast.
-export const DUNGEON_AMBIENT_INTENSITY = 0.09
+
+// Each level has its own signature light source standing in for (or standing
+// next to) the torch — a wisp in the catacombs, a brazier in the arena, a
+// crystal in the tower, a candle in the library, a leaking rift in the glitch
+// dungeon. They are all read against the torch above: a brazier is the one
+// thing that lights a whole room, a wisp or a candle only lights the metre or
+// two around itself, which is what keeps those levels dark even though there
+// are more lights standing in them.
+export const WISP_RADIUS = 7
+export const WISP_INTENSITY = 6
+export const BRAZIER_RADIUS = 13
+export const BRAZIER_INTENSITY = 22
+export const CRYSTAL_RADIUS = 7
+export const CRYSTAL_INTENSITY = 5
+export const CANDLE_RADIUS = 5
+export const CANDLE_INTENSITY = 4
+export const RIFT_RADIUS = 7
+export const RIFT_INTENSITY = 7
+// The scene's ambient fill — just enough to read a silhouette a step outside
+// the light rather than nothing at all — now lives per level in
+// levelTheme.ts, along with the colour it is tinted. Every level sets it
+// somewhere around 0.1; raising it washes that level's darkness out fast, and
+// the arena is the only one deliberately pushed past that.
 
 // Regular attack is now also cast by running Python code, so it gets a
 // short cooldown too — otherwise there's nothing pacing how fast the
