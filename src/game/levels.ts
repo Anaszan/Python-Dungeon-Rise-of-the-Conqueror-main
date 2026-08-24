@@ -67,25 +67,27 @@ const LEVEL_1_WALLS: Wall[] = [
 
 // Every monster in a level is a distinct type — no two share a name, even
 // when they occupy the same "tier" (e.g. two corridor trash mobs). Level 1
-// gives every monster its own sprite art (public/monsters/*.svg); other
-// levels still reuse a shared sprite per stat tier under a new name/color.
+// gives every monster its own art twice over: a low-poly 3D model built in
+// Blender (public/monsters/*.glb, sources in blender/) for the dungeon, and
+// the sprite the combat screen needs; other levels still reuse a shared
+// sprite per stat tier under a new name/color.
 const LEVEL_1_MONSTERS: MonsterData[] = [
   // main corridor
-  { id: 'slime-1', name: 'Slime', maxHp: 30, color: '#6fdc4f', attackDamage: 5, attackInterval: 10, position: [0, 0.5, -4], imageUrl: '/monsters/slime_attack.png' },
-  { id: 'slime-2', name: 'Glitch Slime', maxHp: 30, color: '#a233f2', attackDamage: 5, attackInterval: 10, position: [0, 0.5, -16], imageUrl: '/monsters/glitchslime_attack.png' },
-  { id: 'wraith-2', name: 'Null Wraith', maxHp: 80, color: '#3a3a42', attackDamage: 12, attackInterval: 10, position: [0, 0.5, -28], imageUrl: '/monsters/nullwraith_attack.png' },
+  { id: 'slime-1', name: 'Slime', maxHp: 30, color: '#6fdc4f', attackDamage: 5, attackInterval: 10, position: [0, 0.5, -4], modelUrl: '/monsters/slime_attack.glb', imageUrl: '/monsters/slime_attack.png' },
+  { id: 'slime-2', name: 'Glitch Slime', maxHp: 30, color: '#a233f2', attackDamage: 5, attackInterval: 10, position: [0, 0.5, -16], modelUrl: '/monsters/glitchslime_attack.glb', imageUrl: '/monsters/glitchslime_attack.png' },
+  { id: 'wraith-2', name: 'Null Wraith', maxHp: 80, color: '#3a3a42', attackDamage: 12, attackInterval: 10, position: [0, 0.5, -28], modelUrl: '/monsters/nullwraith_attack.glb', imageUrl: '/monsters/nullwraith_attack.png' },
 
   // west branch room
-  { id: 'goblin-1', name: 'Goblin', maxHp: 50, color: '#8fc23f', attackDamage: 8, attackInterval: 10, position: [-4, 0.5, -8], imageUrl: '/monsters/goblin_attack.png' },
-  { id: 'goblin-2', name: 'Goblin Scout', maxHp: 50, color: '#a8d95e', attackDamage: 8, attackInterval: 10, position: [-6.5, 0.5, -11], imageUrl: '/monsters/goblinscout_attack.png' },
+  { id: 'goblin-1', name: 'Goblin', maxHp: 50, color: '#8fc23f', attackDamage: 8, attackInterval: 10, position: [-4, 0.5, -8], modelUrl: '/monsters/goblin_attack.glb', imageUrl: '/monsters/goblin_attack.png' },
+  { id: 'goblin-2', name: 'Goblin Scout', maxHp: 50, color: '#a8d95e', attackDamage: 8, attackInterval: 10, position: [-6.5, 0.5, -11], modelUrl: '/monsters/goblinscout_attack.glb', imageUrl: '/monsters/goblinscout_attack.png' },
 
   // east branch room
-  { id: 'goblin-3', name: 'Goblin Brute', maxHp: 50, color: '#3a7a26', attackDamage: 8, attackInterval: 10, position: [5, 0.5, -19], imageUrl: '/monsters/goblinbrute_attack.png' },
-  { id: 'wraith-1', name: 'Wraith', maxHp: 80, color: '#8a6fd1', attackDamage: 12, attackInterval: 10, position: [7, 0.5, -21], imageUrl: '/monsters/wraith_attack.png' },
+  { id: 'goblin-3', name: 'Goblin Brute', maxHp: 50, color: '#3a7a26', attackDamage: 8, attackInterval: 10, position: [5, 0.5, -19], modelUrl: '/monsters/goblinbrute_attack.glb', imageUrl: '/monsters/goblinbrute_attack.png' },
+  { id: 'wraith-1', name: 'Wraith', maxHp: 80, color: '#8a6fd1', attackDamage: 12, attackInterval: 10, position: [7, 0.5, -21], modelUrl: '/monsters/wraith_attack.glb', imageUrl: '/monsters/wraith_attack.png' },
 
   // end room
-  { id: 'wraith-3', name: 'Echo Wraith', maxHp: 80, color: '#3a6bd1', attackDamage: 12, attackInterval: 10, position: [-3, 0.5, -37], imageUrl: '/monsters/echowraith_attack.png' },
-  { id: 'dragon-1', name: 'Dragon', maxHp: 150, color: '#e05263', attackDamage: 20, attackInterval: 10, position: [3, 0.5, -37], imageUrl: '/monsters/dragon_attack.png' },
+  { id: 'wraith-3', name: 'Echo Wraith', maxHp: 80, color: '#3a6bd1', attackDamage: 12, attackInterval: 10, position: [-3, 0.5, -37], modelUrl: '/monsters/echowraith_attack.glb', imageUrl: '/monsters/echowraith_attack.png' },
+  { id: 'dragon-1', name: 'Dragon', maxHp: 150, color: '#e05263', attackDamage: 20, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/dragon_attack.glb', imageUrl: '/monsters/dragon_attack.png' },
 ]
 
 const LEVEL_1_PICKUPS: PickupData[] = [

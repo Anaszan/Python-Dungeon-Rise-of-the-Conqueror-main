@@ -24,11 +24,17 @@ function MonsterSprite({ url, scale }: { url: string; scale: number }) {
   )
 }
 
-// This project's GLB monster exports are all flat planes baked from 2D art
-// (zero depth), X-centered, base at local y=0 and top at local y=2 — the
-// same footprint every file measured out to. Normalizing against that fixed
-// raw height lets a model drop in next to the plain image sprites at a
-// matching on-screen size without per-file tuning.
+// Every GLB monster here is X-centered with its base at local y=0 and its top
+// at or below local y=2. The older files are flat planes baked from 2D art
+// (zero depth); level 1's are solid low-poly models built in Blender (sources
+// under blender/). Normalizing against that fixed y=2 raw height lets either
+// kind drop in next to the plain image sprites at a matching on-screen size
+// without per-file tuning — and a deliberately short model (the slimes, at
+// y=1.25) reads as short on screen rather than being stretched to fill.
+//
+// The solid models still render inside the <Billboard> below. Under the fixed
+// isometric camera that costs nothing: it just keeps their front turned to the
+// player, which is where a monster should be looking anyway.
 const MODEL_RAW_HEIGHT = 2
 const MODEL_SCALE = 1.4 / MODEL_RAW_HEIGHT
 
