@@ -14,8 +14,20 @@
 -- missing column, warns once, and keeps playing (the mode is then re-asked
 -- every session instead of being remembered).
 
+-- Written to be safe to run more than once: the SQL Editor makes it very easy
+-- to re-run a file, and a plain `add column` answers that with
+-- "42701: column already exists" — an error that looks like a broken migration
+-- when nothing is actually wrong. Both statements below are no-ops the second
+-- time through.
+
 alter table public.game_saves
-  add column difficulty text;
+  add column if not exists difficulty text;
+
+-- Postgres has no `add constraint if not exists`, so drop-then-add is the
+-- idempotent form. Dropping is safe here: the constraint is re-created in the
+-- same statement pair, and it only ever rejected values the app never writes.
+alter table public.game_saves
+  drop constraint if exists game_saves_difficulty_check;
 
 alter table public.game_saves
   add constraint game_saves_difficulty_check
