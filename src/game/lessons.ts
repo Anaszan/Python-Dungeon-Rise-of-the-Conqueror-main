@@ -53,18 +53,20 @@ export type LessonData = {
   // untouched skeleton reads as "you still need to finish this" rather than
   // a silent no-op. Most levels only need one variant; level 1 has several
   // so the blank sometimes asks for a number literal and sometimes for a
-  // variable name instead of always the same fill-in — see pickSkeleton().
+  // variable name instead of always the same fill-in — see pickVariant().
+  // Hard mode ignores these entirely and uses trials.ts instead.
   attackSkeletons: string[]
   skillSkeletons: string[]
   exam: ExamSpec
 }
 
 // Deterministic pick, not Math.random(): the same monster always shows the
-// same skeleton variant (stable if the component re-renders), but different
-// monsters within a level land on different variants, so a 9-monster level
-// like level 1 naturally cycles through "fill a number" and "fill a
-// variable" versions of the exercise as the player fights their way through.
-export function pickSkeleton(variants: string[], seed: string): string {
+// same variant (stable if the component re-renders), but different monsters
+// within a level land on different variants, so a 9-monster level like level 1
+// naturally cycles through "fill a number" and "fill a variable" versions of
+// the exercise as the player fights their way through. Hard mode reuses this
+// to hand each monster its own โจทย์ (see trials.ts pickSpellTask).
+export function pickVariant<T>(variants: T[], seed: string): T {
   if (variants.length <= 1) return variants[0]
   let hash = 0
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
@@ -93,7 +95,7 @@ print(f"{name} มีทอง {gold} เหรียญ")
 `,
     // Three variants each, mixing "fill a number" and "fill a variable
     // name" blanks so the exercise doesn't feel identical against every one
-    // of level 1's 9 monsters — see pickSkeleton() above.
+    // of level 1's 9 monsters — see pickVariant() above.
     attackSkeletons: [
       `# ตัวแปรเก็บพลังโจมตีของเจ้าอยู่ใน atk แล้ว
 damage = ___  # TODO: ใส่ตัวแปรพลังโจมตีของเจ้า

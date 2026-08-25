@@ -11,6 +11,7 @@ import {
   type CharacterGender,
 } from '../character/characterOptions'
 import { playAttackImpact, playPlayerHurt } from '../audio/soundEngine'
+import type { Difficulty } from './difficulty'
 
 export type CombatMonster = {
   id: string
@@ -54,6 +55,12 @@ type GameState = {
   // written before migrations_009 loads as.
   shirtColor: string | null
   characterName: string | null
+  // How every monster fight asks for its code — see difficulty.ts. null means
+  // this player has never chosen, which is what puts DifficultySelect on
+  // screen between the customize screen and the first chapter intro (App.tsx).
+  // Unlike the character it is not a one-time decision: the pause menu can
+  // switch it mid-run, and the next fight (and the next box reset) follows.
+  difficulty: Difficulty | null
   saveLoaded: boolean
   // Mid-game pause: freezes player movement, the combat attack timer, and
   // exploration triggers (see the `paused` checks in Player.tsx, GameScene.tsx,
@@ -82,6 +89,7 @@ type GameState = {
     shirtColor: string | null,
     characterName: string,
   ) => void
+  setDifficulty: (difficulty: Difficulty) => void
   // Editing an existing character from the profile screen. Deliberately does
   // not touch characterName: that one is claimed at creation and is the only
   // part of a character another player can collide with.
@@ -114,6 +122,7 @@ async function persist(): Promise<boolean> {
     skinColor,
     shirtColor,
     characterName,
+    difficulty,
   } = useGameStore.getState()
   return saveProgress(userId, {
     defeatedMonsterIds: [...defeatedIds],
@@ -127,6 +136,7 @@ async function persist(): Promise<boolean> {
     skinColor,
     shirtColor,
     characterName,
+    difficulty,
   })
 }
 
@@ -148,6 +158,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   skinColor: DEFAULT_SKIN_COLOR,
   shirtColor: null,
   characterName: null,
+  difficulty: null,
   saveLoaded: false,
   paused: false,
 
@@ -293,6 +304,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     persist()
   },
 
+  // Chosen on DifficultySelect before the first level, and changeable later
+  // from the pause menu. Nothing about the current fight is reset here: the
+  // code boxes re-seed themselves from the new difficulty on their next
+  // render (see SpellConsole's task effects), so switching mid-fight swaps
+  // the โจทย์ without touching anyone's HP.
+  setDifficulty: (difficulty) => {
+    set({ difficulty })
+    persist()
+  },
+
   updateAppearance: (appearance) => {
     set(appearance)
     return persist()
@@ -326,6 +347,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       skinColor: save.skinColor,
       shirtColor: save.shirtColor,
       characterName: save.characterName,
+      // Stays null for a save written before migrations_011 (or before the
+      // player ever reached the picker), which sends them to DifficultySelect
+      // once and then remembers the answer.
+      difficulty: save.difficulty,
       saveLoaded: true,
     })
   },
@@ -371,6 +396,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       skinColor: DEFAULT_SKIN_COLOR,
       shirtColor: null,
       characterName: null,
+      difficulty: null,
       saveLoaded: false,
       paused: false,
     }),

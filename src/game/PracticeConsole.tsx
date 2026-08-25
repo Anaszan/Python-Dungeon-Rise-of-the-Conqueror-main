@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { castSpell, getPyodide } from './pyodideRuntime'
-import { pickSkeleton, type LessonData } from './lessons'
+import type { LessonData } from './lessons'
 import { CodeBox, type BoxState } from './SpellConsole'
+import { pickSpellTask, type SpellTask } from './trials'
+import { TrialBrief } from './TrialBrief'
+import { type Difficulty } from './difficulty'
 
 const DUMMY_MAX_HP = 50
 const DUMMY_NAME = 'หุ่นฝึกซ้อม'
@@ -10,39 +13,50 @@ function freshBox(code: string): BoxState {
   return { code, casting: false, log: [], error: null }
 }
 
-function randomSkeleton(variants: string[]): string {
-  return variants[Math.floor(Math.random() * variants.length)]
-}
-
 // A safe practice fight shown on ChapterIntro before the player ever steps
 // into the level — same two-box attack/skill mechanic as real combat
 // (SpellConsole), but against a local training dummy instead of the game
 // store, so trying things out here has zero risk (no HP lost, no cooldown
 // carried into the real fight). Reuses CodeBox from SpellConsole.tsx so the
 // editor/log/run-button look and behave identically in both places.
+//
+// It also mirrors the chosen difficulty: a hard-mode player practices against
+// a real โจทย์ with its checklist, not against a fill-in-the-blank skeleton
+// they will never see again. Unlike real combat, the checklist here does not
+// block the run — this is the one room where a half-finished idea is supposed
+// to be runnable.
 export function PracticeConsole({
   lesson,
+  difficulty,
   playerHp,
   playerAtk,
   monsterArmor,
 }: {
   lesson: LessonData
+  difficulty: Difficulty
   playerHp: number
   playerAtk: number
   monsterArmor: number
 }) {
   const [warming, setWarming] = useState(true)
   const [dummyHp, setDummyHp] = useState(DUMMY_MAX_HP)
-  const [attackBox, setAttackBox] = useState<BoxState>(() => freshBox(pickSkeleton(lesson.attackSkeletons, 'practice:atk')))
-  const [skillBox, setSkillBox] = useState<BoxState>(() => freshBox(pickSkeleton(lesson.skillSkeletons, 'practice:skill')))
+  // Bumped by the reroll button to pull a different variant out of the
+  // chapter — a different skeleton on easy, a different โจทย์ on hard.
+  const [round, setRound] = useState(0)
 
-  // New level's lesson → fresh dummy and skeleton, same as SpellConsole
-  // does when the lesson changes.
+  const attackTask = pickSpellTask(lesson, difficulty, 'attack', `practice:atk:${round}`)
+  const skillTask = pickSpellTask(lesson, difficulty, 'skill', `practice:skill:${round}`)
+
+  const [attackBox, setAttackBox] = useState<BoxState>(() => freshBox(attackTask.code))
+  const [skillBox, setSkillBox] = useState<BoxState>(() => freshBox(skillTask.code))
+
+  // New level's lesson, a different difficulty, or a reroll → fresh dummy and
+  // fresh tasks, same as SpellConsole does when the fight changes.
   useEffect(() => {
     setDummyHp(DUMMY_MAX_HP)
-    setAttackBox(freshBox(pickSkeleton(lesson.attackSkeletons, 'practice:atk')))
-    setSkillBox(freshBox(pickSkeleton(lesson.skillSkeletons, 'practice:skill')))
-  }, [lesson])
+    setAttackBox(freshBox(pickSpellTask(lesson, difficulty, 'attack', `practice:atk:${round}`).code))
+    setSkillBox(freshBox(pickSpellTask(lesson, difficulty, 'skill', `practice:skill:${round}`).code))
+  }, [lesson, difficulty, round])
 
   useEffect(() => {
     let cancelled = false
@@ -76,18 +90,12 @@ export function PracticeConsole({
     // thing, so nothing should feel like it's being "spent".
   }
 
-  // Picks a new random variant (when the lesson has more than one) instead
-  // of the deterministic per-monster one SpellConsole uses, so a player who
-  // wants to see the other fill-in-the-blank flavors before the real fight
-  // can just ask for another one.
-  function reroll() {
-    setDummyHp(DUMMY_MAX_HP)
-    setAttackBox(freshBox(randomSkeleton(lesson.attackSkeletons)))
-    setSkillBox(freshBox(randomSkeleton(lesson.skillSkeletons)))
-  }
-
   const dummyDefeated = dummyHp <= 0
   const hpPct = Math.max(0, Math.min(100, (dummyHp / DUMMY_MAX_HP) * 100))
+
+  function briefOf(task: SpellTask, code: string) {
+    return task.trial ? <TrialBrief trial={task.trial} code={code} /> : undefined
+  }
 
   return (
     <div className="practice-console">
@@ -102,7 +110,7 @@ export function PracticeConsole({
             {dummyHp} / {DUMMY_MAX_HP} HP
           </p>
         </div>
-        <button className="practice-reroll-btn" onClick={reroll}>
+        <button className="practice-reroll-btn" onClick={() => setRound((n) => n + 1)}>
           🔄 ฝึกใหม่ (สุ่มโจทย์)
         </button>
       </div>
@@ -113,6 +121,7 @@ export function PracticeConsole({
         <CodeBox
           title="ฝึกโจมตี"
           state={attackBox}
+          brief={briefOf(attackTask, attackBox.code)}
           onChange={(code) => setAttackBox({ ...attackBox, code })}
           onRun={() => run(attackBox, setAttackBox)}
           label={warming ? 'กำลังเรียกพลังจากอีกมิติ...' : attackBox.casting ? 'กำลังร่ายคาถา...' : 'ทดลองร่าย ⚡'}
@@ -121,6 +130,7 @@ export function PracticeConsole({
         <CodeBox
           title="ฝึกสกิลพิเศษ"
           state={skillBox}
+          brief={briefOf(skillTask, skillBox.code)}
           onChange={(code) => setSkillBox({ ...skillBox, code })}
           onRun={() => run(skillBox, setSkillBox)}
           label={warming ? 'กำลังเรียกพลังจากอีกมิติ...' : skillBox.casting ? 'กำลังร่ายคาถา...' : 'ทดลองร่าย ✦'}

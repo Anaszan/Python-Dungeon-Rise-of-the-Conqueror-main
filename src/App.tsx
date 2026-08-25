@@ -7,6 +7,7 @@ import { StoryIntro } from './screens/StoryIntro'
 import { LoginScreen } from './screens/LoginScreen'
 import { ResetPasswordScreen } from './screens/ResetPasswordScreen'
 import { CharacterCustomize } from './screens/CharacterCustomize'
+import { DifficultySelect } from './screens/DifficultySelect'
 import { SaveLoadError } from './screens/SaveLoadError'
 import { ChapterIntro } from './screens/ChapterIntro'
 import { Leaderboard } from './screens/Leaderboard'
@@ -42,6 +43,7 @@ function App() {
   const characterClass = useGameStore((s) => s.characterClass)
   const characterName = useGameStore((s) => s.characterName)
   const currentLevel = useGameStore((s) => s.currentLevel)
+  const difficulty = useGameStore((s) => s.difficulty)
   const phase = useGameStore((s) => s.phase)
 
   useEffect(() => {
@@ -117,11 +119,20 @@ function App() {
     content = <CharacterCustomize />
     playMenuMusic = true
     showSoundToggle = true
+  } else if (!difficulty) {
+    // Straight after the character exists and before the first chapter intro:
+    // the player picks how the code boxes in combat will ask for their spells
+    // (see difficulty.ts). Answered once and remembered in the save; the pause
+    // menu can change it later, which is why this is not a one-shot flag.
+    content = <DifficultySelect />
+    playMenuMusic = true
+    showSoundToggle = true
   } else if (chapterIntroSeenFor !== currentLevel) {
     content = (
       <ChapterIntro
         level={currentLevel}
         lesson={LESSONS[currentLevel - 1]}
+        difficulty={difficulty}
         onStart={() => setChapterIntroSeenFor(currentLevel)}
       />
     )

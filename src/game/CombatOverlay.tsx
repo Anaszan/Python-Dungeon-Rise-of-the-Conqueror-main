@@ -7,6 +7,7 @@ import { Mentor } from '../components/Mentor'
 import { SpellConsole } from './SpellConsole'
 import { DEFAULT_CHARACTER_CLASS } from '../character/characterOptions'
 import { CharacterPortrait } from '../character/CharacterPortrait'
+import { DEFAULT_DIFFICULTY, difficultyLabel } from './difficulty'
 
 // Pokemon-style HP bars read their state from color before you parse the
 // numbers: green while healthy, amber once it bites, red in the danger zone.
@@ -28,6 +29,10 @@ export function CombatOverlay() {
   const attackCooldown = useGameStore((s) => s.attackCooldown)
   const monsterAttackCountdown = useGameStore((s) => s.monsterAttackCountdown)
   const characterClass = useGameStore((s) => s.characterClass) ?? DEFAULT_CHARACTER_CLASS
+  // Falls back only in the impossible case of reaching a fight without ever
+  // answering DifficultySelect — App.tsx does not render the dungeon until the
+  // choice exists.
+  const difficulty = useGameStore((s) => s.difficulty) ?? DEFAULT_DIFFICULTY
   const gender = useGameStore((s) => s.gender)
   const skinColor = useGameStore((s) => s.skinColor)
   const shirtColor = useGameStore((s) => s.shirtColor)
@@ -149,6 +154,7 @@ export function CombatOverlay() {
         </div>
 
         <div className="battle-command-box">
+          <p className="battle-difficulty-badge">{difficultyLabel(difficulty)}</p>
           {defeated ? (
             <div className="battle-result">
               <p className="combat-message">
@@ -165,14 +171,23 @@ export function CombatOverlay() {
               <Mentor
                 key={activeMonsterId}
                 compact
-                lines={[
-                  `เจ้าพบ ${monster.name}! ใช้กล่อง "โจมตี" กับ "สกิลพิเศษ" ด้านล่าง ทั้งสองต้องเขียนโค้ด Python เองทั้งคู่`,
-                  `ทบทวนบทที่ ${lesson.chapter} (${lesson.chapterTitle}) ได้จากคำใบ้ในโค้ดตั้งต้น หรือย้อนกลับไปฟังคำสอนตอนเข้าด่านนี้ใหม่อีกครั้ง`,
-                  'ทั้งสองคาถามีช่วงพักพลัง (คูลดาวน์) หลังร่ายทุกครั้ง — โจมตีพักสั้นกว่า สกิลพิเศษพักนานกว่าแต่แรงกว่า',
-                ]}
+                lines={
+                  difficulty === 'hard'
+                    ? [
+                        `เจ้าพบ ${monster.name}! มันส่งโจทย์มาให้เจ้าสองข้อ — หนึ่งข้อสำหรับกล่อง "โจมตี" อีกข้อสำหรับ "สกิลพิเศษ"`,
+                        'อ่านโจทย์เหนือกล่องโค้ดให้ครบ แล้วเขียนคาถาเองทั้งหมด — ถ้ายังทำเงื่อนไขไม่ครบ คาถาจะร่ายไม่ออกและไม่เสียคูลดาวน์',
+                        `ทบทวนบทที่ ${lesson.chapter} (${lesson.chapterTitle}) ได้จากปุ่ม "ขอคำใบ้" ใต้โจทย์แต่ละข้อ`,
+                      ]
+                    : [
+                        `เจ้าพบ ${monster.name}! ใช้กล่อง "โจมตี" กับ "สกิลพิเศษ" ด้านล่าง ทั้งสองต้องเขียนโค้ด Python เองทั้งคู่`,
+                        `ทบทวนบทที่ ${lesson.chapter} (${lesson.chapterTitle}) ได้จากคำใบ้ในโค้ดตั้งต้น หรือย้อนกลับไปฟังคำสอนตอนเข้าด่านนี้ใหม่อีกครั้ง`,
+                        'ทั้งสองคาถามีช่วงพักพลัง (คูลดาวน์) หลังร่ายทุกครั้ง — โจมตีพักสั้นกว่า สกิลพิเศษพักนานกว่าแต่แรงกว่า',
+                      ]
+                }
               />
               <SpellConsole
                 lesson={lesson}
+                difficulty={difficulty}
                 monsterId={activeMonsterId}
                 monsterHp={hp}
                 monsterName={monster.name}

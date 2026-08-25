@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase'
 import { PLAYER_MAX_HP, BASE_ATTACK_POWER } from './constants'
 import type { CharacterClass, CharacterGender } from '../character/characterOptions'
 import { DEFAULT_GENDER, DEFAULT_SKIN_COLOR } from '../character/characterOptions'
+import { isDifficulty, type Difficulty } from './difficulty'
 
 export type SaveData = {
   defeatedMonsterIds: string[]
@@ -15,42 +16,63 @@ export type SaveData = {
   skinColor: string
   shirtColor: string | null
   characterName: string | null
+  // null = never chosen (or a save older than migrations_011). The game asks
+  // once on DifficultySelect and remembers the answer from then on.
+  difficulty: Difficulty | null
 }
 
 // Running against a project that has not had every migration applied yet.
 //
-// shirt_color (migrations_009) is the one column the game can honestly do
-// without: it is a cosmetic choice, and a save that predates it renders in the
-// outfit's own color anyway. Rather than refusing to start — which is what an
-// unrecognised column does to the whole read, and with it the whole game — the
-// two functions below notice that particular failure, carry on without the
-// column, and say so in the console. Everything else still fails loudly.
+// These are the columns the game can honestly do without. shirt_color
+// (migrations_009) is a cosmetic choice, and a save that predates it renders
+// in the outfit's own color anyway; difficulty (migrations_011) only decides
+// whether the player is asked to pick a mode again next session. Rather than
+// refusing to start — which is what an unrecognised column does to the whole
+// read, and with it the whole game — the helpers below notice that particular
+// failure, carry on without the column, and say so in the console. Everything
+// else still fails loudly.
 //
 // Nothing else degrades this way. A missing name-uniqueness migration is a
 // correctness problem, not a cosmetic one, and is handled where it matters
 // (claimCharacterName).
 const SAVE_COLUMNS =
   'defeated_monster_ids, player_hp, attack_power, collected_pickup_ids, current_level, skill_cooldown, character_class, gender, skin_color, character_name'
-const SHIRT_COLOR_COLUMN = 'shirt_color'
 
-// null until the first read finds out, so later requests skip an attempt
-// already known to fail.
-let hasShirtColor: boolean | null = null
+const OPTIONAL_COLUMNS = {
+  shirt_color: {
+    consequence: 'the shirt color will not be remembered between sessions',
+    migration: 'supabase/migrations_009_character_shirt_color.sql',
+  },
+  difficulty: {
+    consequence: 'the chosen difficulty will not be remembered between sessions',
+    migration: 'supabase/migrations_011_difficulty.sql',
+  },
+} as const
 
-function isMissingShirtColor(error: { code?: string; message: string }) {
-  // 42703 is Postgres' undefined_column. PostgREST passes it straight through,
-  // but the code is checked against the message too so a project that reports
-  // it differently is not misread as a healthy database.
-  return (error.code === '42703' || error.message.includes('does not exist')) && error.message.includes(SHIRT_COLOR_COLUMN)
+type OptionalColumn = keyof typeof OPTIONAL_COLUMNS
+
+// Columns this project has already told us it does not have, so later requests
+// skip an attempt known to fail.
+const missingColumns = new Set<OptionalColumn>()
+
+function presentOptionalColumns(): OptionalColumn[] {
+  return (Object.keys(OPTIONAL_COLUMNS) as OptionalColumn[]).filter((c) => !missingColumns.has(c))
 }
 
-function warnMissingShirtColor() {
-  if (hasShirtColor === false) return
-  hasShirtColor = false
-  console.warn(
-    `game_saves.${SHIRT_COLOR_COLUMN} is missing, so the shirt color will not be remembered between sessions. ` +
-      'Run supabase/migrations_009_character_shirt_color.sql to enable it.',
-  )
+// Which optional column (if any) this error is complaining about. 42703 is
+// Postgres' undefined_column. PostgREST passes it straight through, but the
+// code is checked against the message too so a project that reports it
+// differently is not misread as a healthy database.
+function missingOptionalColumn(error: { code?: string; message: string }): OptionalColumn | undefined {
+  if (error.code !== '42703' && !error.message.includes('does not exist')) return undefined
+  return presentOptionalColumns().find((column) => error.message.includes(column))
+}
+
+function warnMissingColumn(column: OptionalColumn) {
+  if (missingColumns.has(column)) return
+  missingColumns.add(column)
+  const { consequence, migration } = OPTIONAL_COLUMNS[column]
+  console.warn(`game_saves.${column} is missing, so ${consequence}. Run ${migration} to enable it.`)
 }
 
 // Throws if the save cannot be read, and the caller (App) keeps the player on
@@ -79,24 +101,31 @@ export async function loadSave(userId: string): Promise<SaveData> {
     skin_color: string | null
     shirt_color: string | null
     character_name: string | null
+    difficulty: string | null
   }>
 
-  const read = async (columns: string) => {
-    const result = await supabase.from('game_saves').select(columns).eq('user_id', userId).maybeSingle()
+  const read = async (columns: string[]) => {
+    const result = await supabase
+      .from('game_saves')
+      .select([SAVE_COLUMNS, ...columns].join(', '))
+      .eq('user_id', userId)
+      .maybeSingle()
     return { data: result.data as SaveRow | null, error: result.error }
   }
 
-  let { data, error } = await read(
-    hasShirtColor === false ? SAVE_COLUMNS : `${SAVE_COLUMNS}, ${SHIRT_COLOR_COLUMN}`,
-  )
+  let { data, error } = await read(presentOptionalColumns())
 
-  if (error && isMissingShirtColor(error)) {
-    warnMissingShirtColor()
-    ;({ data, error } = await read(SAVE_COLUMNS))
+  // One retry per optional column: each failed read names at most one missing
+  // column, so a project missing two of them takes two extra round trips and
+  // then settles, rather than looping.
+  for (let attempt = 0; error && attempt < Object.keys(OPTIONAL_COLUMNS).length; attempt++) {
+    const column = missingOptionalColumn(error)
+    if (!column) break
+    warnMissingColumn(column)
+    ;({ data, error } = await read(presentOptionalColumns()))
   }
 
   if (error) throw new Error(error.message)
-  if (hasShirtColor === null) hasShirtColor = true
 
   return {
     defeatedMonsterIds: data?.defeated_monster_ids ?? [],
@@ -114,6 +143,10 @@ export async function loadSave(userId: string): Promise<SaveData> {
     // their outfit exactly the color it has always rendered in.
     shirtColor: data?.shirt_color ?? null,
     characterName: data?.character_name ?? null,
+    // Anything other than 'easy'/'hard' — including a save written before
+    // migrations_011 — reads as "never chosen", which shows the picker once
+    // rather than silently deciding for the player.
+    difficulty: isDifficulty(data?.difficulty) ? data.difficulty : null,
   }
 }
 
@@ -135,15 +168,25 @@ export async function saveProgress(userId: string, save: SaveData): Promise<bool
     updated_at: new Date().toISOString(),
   }
 
-  const write = (values: object) => supabase.from('game_saves').upsert(values)
+  // Same per-column values the read side knows how to do without.
+  const optionalValues: Record<OptionalColumn, unknown> = {
+    shirt_color: save.shirtColor,
+    difficulty: save.difficulty,
+  }
 
-  let { error } = await write(
-    hasShirtColor === false ? row : { ...row, [SHIRT_COLOR_COLUMN]: save.shirtColor },
-  )
+  const write = (columns: OptionalColumn[]) => {
+    const values: Record<string, unknown> = { ...row }
+    for (const column of columns) values[column] = optionalValues[column]
+    return supabase.from('game_saves').upsert(values)
+  }
 
-  if (error && isMissingShirtColor(error)) {
-    warnMissingShirtColor()
-    ;({ error } = await write(row))
+  let { error } = await write(presentOptionalColumns())
+
+  for (let attempt = 0; error && attempt < Object.keys(OPTIONAL_COLUMNS).length; attempt++) {
+    const column = missingOptionalColumn(error)
+    if (!column) break
+    warnMissingColumn(column)
+    ;({ error } = await write(presentOptionalColumns()))
   }
 
   // Progress is written constantly and the game keeps its own copy in the

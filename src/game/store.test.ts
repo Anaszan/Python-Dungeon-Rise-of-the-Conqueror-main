@@ -43,6 +43,7 @@ const loadedSave = {
   skinColor: DEFAULT_SKIN_COLOR,
   shirtColor: null,
   characterName: 'Rin',
+  difficulty: 'easy' as const,
 }
 
 describe('useGameStore', () => {
@@ -250,6 +251,7 @@ describe('useGameStore', () => {
       skinColor: DEFAULT_SKIN_COLOR,
       shirtColor: null,
       characterName: 'Rin',
+      difficulty: 'hard',
     })
     const s = useGameStore.getState()
     expect(s.phase).toBe('exam')
@@ -269,6 +271,7 @@ describe('useGameStore', () => {
       skinColor: DEFAULT_SKIN_COLOR,
       shirtColor: null,
       characterName: 'Shade',
+      difficulty: 'easy',
     })
     const s = useGameStore.getState()
     expect(s.phase).toBe('gameover')
@@ -289,6 +292,9 @@ describe('useGameStore', () => {
       skinColor: DEFAULT_SKIN_COLOR,
       shirtColor: null,
       characterName: null,
+      // A save older than migrations_011 never chose a difficulty, which is
+      // what puts the picker on screen once (see App.tsx).
+      difficulty: null,
     })
     expect(useGameStore.getState().phase).toBe('exploring')
   })

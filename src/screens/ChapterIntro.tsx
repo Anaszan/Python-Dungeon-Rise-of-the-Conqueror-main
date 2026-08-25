@@ -2,19 +2,23 @@ import { Mentor } from '../components/Mentor'
 import { PracticeConsole } from '../game/PracticeConsole'
 import { useGameStore } from '../game/store'
 import type { LessonData } from '../game/lessons'
+import { difficultyLabel, type Difficulty } from '../game/difficulty'
 
 // Shown once per level, right before the dungeon renders — see App.tsx. The
 // wizard teaches that level's chapter (variables, conditionals, loops,
 // functions, file handling, error handling), then a PracticeConsole lets the
-// player actually try the attack/skill skeleton against a harmless training
-// dummy before they ever meet a real monster with it.
+// player actually try the attack/skill task against a harmless training dummy
+// before they ever meet a real monster with it — in whichever difficulty they
+// chose, so the practice matches the fights that follow.
 export function ChapterIntro({
   level,
   lesson,
+  difficulty,
   onStart,
 }: {
   level: number
   lesson: LessonData
+  difficulty: Difficulty
   onStart: () => void
 }) {
   const playerHp = useGameStore((s) => s.playerHp)
@@ -28,7 +32,7 @@ export function ChapterIntro({
     <div className="screen-overlay">
       <div className="chapter-intro-panel">
         <p className="chapter-intro-eyebrow">
-          ด่าน {level} · บทที่ {lesson.chapter}
+          ด่าน {level} · บทที่ {lesson.chapter} · {difficultyLabel(difficulty)}
         </p>
         <h1 className="chapter-intro-title">{lesson.chapterTitle}</h1>
         <Mentor lines={lesson.teachingLines} />
@@ -46,7 +50,13 @@ export function ChapterIntro({
             <code>{lesson.exampleCode}</code>
           </pre>
         </div>
-        <PracticeConsole lesson={lesson} playerHp={playerHp} playerAtk={attackPower} monsterArmor={monsterArmor} />
+        <PracticeConsole
+          lesson={lesson}
+          difficulty={difficulty}
+          playerHp={playerHp}
+          playerAtk={attackPower}
+          monsterArmor={monsterArmor}
+        />
         <button onClick={onStart}>เข้าด่าน {level}</button>
       </div>
     </div>

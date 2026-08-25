@@ -2141,3 +2141,184 @@ canvas {
   color: #8a8270;
   cursor: not-allowed;
 }
+
+/* --- ระดับความท้าทายของโค้ด (difficulty.ts) --------------------------------
+   The picker shown between character creation and the first chapter, the
+   compact switch on the pause menu, and the โจทย์ panel hard mode puts on top
+   of every code box. The trial panel deliberately borrows the exam's
+   checklist styles (.exam-check*, .exam-brief-line, .exam-hints) — a hard-mode
+   fight is meant to look like a small end-of-level exam. */
+
+.difficulty-panel {
+  gap: 4px;
+}
+
+.difficulty-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin: 18px 0 4px;
+}
+
+.difficulty-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--parchment-text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.difficulty-card:hover {
+  border-color: var(--gold-bright);
+  transform: translateY(-2px);
+}
+
+.difficulty-card-selected {
+  border-color: var(--arcane-bright);
+  background: rgba(124, 92, 255, 0.14);
+  box-shadow: 0 0 0 2px rgba(124, 92, 255, 0.35);
+}
+
+.difficulty-card-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+}
+
+.difficulty-card-name {
+  font-family: 'Cinzel', 'Noto Sans Thai', serif;
+  font-size: 17px;
+  color: var(--gold-bright);
+}
+
+.difficulty-card-tagline {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--parchment-text);
+}
+
+.difficulty-card-bullets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.difficulty-card-bullet {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--parchment-dim);
+}
+
+.difficulty-card-sample {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--wood-dark);
+  border: 1px solid var(--gold-dim);
+  overflow-x: auto;
+}
+
+.difficulty-card-sample code {
+  font-family: ui-monospace, SFMono-Regular, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #cfe9c8;
+  white-space: pre;
+}
+
+.difficulty-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--parchment-dim);
+}
+
+.difficulty-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.difficulty-switch-btn {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--parchment-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.difficulty-switch-btn-active {
+  border-color: var(--arcane-bright);
+  background: rgba(124, 92, 255, 0.16);
+}
+
+.difficulty-switch-name {
+  font-size: 13px;
+  color: var(--gold-bright);
+}
+
+.difficulty-switch-tagline {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--parchment-dim);
+}
+
+.battle-difficulty-badge {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--parchment-dim);
+}
+
+.trial-brief {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px dashed var(--gold-dim);
+  text-align: left;
+}
+
+.trial-brief-title {
+  margin: 0 0 8px;
+  font-family: 'Cinzel', 'Noto Sans Thai', serif;
+  font-size: 14px;
+  color: var(--gold-bright);
+}
+
+.trial-hint-btn {
+  margin-top: 10px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--gold-dim);
+  background: var(--wood-light);
+  color: var(--parchment-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.trial-hint-btn:hover {
+  border-color: var(--gold-bright);
+}
+
+.trial-hints {
+  margin-top: 10px;
+  max-width: none;
+}
