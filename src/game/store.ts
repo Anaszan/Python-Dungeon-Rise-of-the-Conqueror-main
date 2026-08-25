@@ -82,6 +82,9 @@ type GameState = {
   passLevelExam: () => void
   clearFledMonster: () => void
   setPaused: (paused: boolean) => void
+  // Admin-only jump to any level (see src/admin/). Not reachable from normal
+  // play — the only way past a level's gate is passLevelExam().
+  warpToLevel: (level: number) => void
   confirmCharacter: (
     characterClass: CharacterClass,
     gender: CharacterGender,
@@ -298,6 +301,32 @@ export const useGameStore = create<GameState>((set, get) => ({
   clearFledMonster: () => set({ fledMonsterId: null }),
 
   setPaused: (paused) => set({ paused }),
+
+  // Drops the player at the start of any level, for testing. Nothing else is
+  // touched — HP, attack power, defeated monsters and collected pickups all
+  // carry over — so warping away and back leaves progress exactly as it was.
+  //
+  // The phase is re-derived the same way hydrateSave does it: warping into a
+  // level whose monsters are already dead has to land on that level's exam,
+  // because 'exam' is only ever entered by leaving a fight (exitCombat) and
+  // there are no fights left to leave. Without this the admin would arrive in
+  // an empty dungeon with no way forward.
+  warpToLevel: (level) => {
+    const { playerHp, defeatedIds, currentLevel } = get()
+    if (playerHp <= 0) return // dead — the game-over overlay owns the screen
+    const target = Math.min(Math.max(Math.round(level), 1), LEVELS.length)
+    if (target === currentLevel) return
+
+    const cleared = LEVELS[target - 1].monsters.every((m) => defeatedIds.has(m.id))
+    set({
+      currentLevel: target,
+      phase: cleared ? 'exam' : 'exploring',
+      activeMonsterId: null,
+      fledMonsterId: null,
+      paused: false,
+    })
+    persist()
+  },
 
   confirmCharacter: (characterClass, gender, skinColor, shirtColor, characterName) => {
     set({ characterClass, gender, skinColor, shirtColor, characterName })

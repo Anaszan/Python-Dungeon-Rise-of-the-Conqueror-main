@@ -165,6 +165,49 @@ describe('useGameStore', () => {
     expect(useGameStore.getState().phase).toBe('victory')
   })
 
+  // The admin warp (src/admin/) is the one thing in the game that moves
+  // between levels without passing an exam, so what it does *not* touch
+  // matters as much as what it does.
+  describe('warpToLevel', () => {
+    it('jumps to any level without disturbing progress', () => {
+      useGameStore.setState({ currentLevel: 1, playerHp: 100, defeatedIds: new Set(['slime-1']), phase: 'exploring' })
+
+      useGameStore.getState().warpToLevel(4)
+
+      const s = useGameStore.getState()
+      expect(s.currentLevel).toBe(4)
+      expect(s.phase).toBe('exploring')
+      expect(s.playerHp).toBe(100)
+      expect(s.defeatedIds.has('slime-1')).toBe(true)
+    })
+
+    it('lands on the exam when the target level is already cleared', () => {
+      // 'exam' is only ever entered by leaving a fight, and a cleared level
+      // has none left — without deriving it here the admin would arrive in an
+      // empty dungeon with no way out of it.
+      const ids = LEVELS[2].monsters.map((m) => m.id)
+      useGameStore.setState({ currentLevel: 1, playerHp: 100, defeatedIds: new Set(ids) })
+
+      useGameStore.getState().warpToLevel(3)
+
+      expect(useGameStore.getState().phase).toBe('exam')
+      expect(useGameStore.getState().currentLevel).toBe(3)
+    })
+
+    it('refuses to move a dead character or to leave the map', () => {
+      useGameStore.setState({ currentLevel: 2, playerHp: 0, phase: 'gameover' })
+      useGameStore.getState().warpToLevel(5)
+      expect(useGameStore.getState().currentLevel).toBe(2)
+
+      useGameStore.setState({ currentLevel: 2, playerHp: 100, phase: 'exploring' })
+      useGameStore.getState().warpToLevel(999)
+      expect(useGameStore.getState().currentLevel).toBe(LEVELS.length)
+
+      useGameStore.getState().warpToLevel(-3)
+      expect(useGameStore.getState().currentLevel).toBe(1)
+    })
+  })
+
   it('exitCombat treats an undefeated monster as a flee, not a level clear', () => {
     useGameStore.getState().enterCombat({ id: 'slime-1', name: 'Slime', maxHp: 30, attackInterval: 10 })
     useGameStore.setState({ playerHp: 100 })

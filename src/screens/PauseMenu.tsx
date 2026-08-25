@@ -3,12 +3,15 @@ import { useAuthStore } from '../auth/authStore'
 import { VolumeSettings } from '../audio/VolumeSettings'
 import { ProfileEditor } from './ProfileEditor'
 import { DIFFICULTY_OPTIONS } from '../game/difficulty'
+import { useAdminStore } from '../admin/adminStore'
 
 export function PauseMenu() {
   const paused = useGameStore((s) => s.paused)
   const setPaused = useGameStore((s) => s.setPaused)
   const difficulty = useGameStore((s) => s.difficulty)
   const setDifficulty = useGameStore((s) => s.setDifficulty)
+  const isAdmin = useAdminStore((s) => s.isAdmin)
+  const setPanelOpen = useAdminStore((s) => s.setPanelOpen)
   const signOut = useAuthStore((s) => s.signOut)
 
   if (!paused) return null
@@ -47,6 +50,18 @@ export function PauseMenu() {
         <div className="customize-section">
           <ProfileEditor />
         </div>
+
+        {/* Only rendered for an account the server confirmed is an admin. The
+            panel itself lives at App level, so it stays up (and the game stays
+            paused behind it) until it is closed. */}
+        {isAdmin && (
+          <div className="customize-section">
+            <p className="customize-section-label">ผู้ดูแลระบบ</p>
+            <button type="button" className="pause-admin-btn" onClick={() => setPanelOpen(true)}>
+              🛡 เปิดแผงควบคุมแอดมิน (วาร์ปข้ามด่าน / แดชบอร์ดผู้เล่น)
+            </button>
+          </div>
+        )}
 
         <button type="button" className="customize-confirm" onClick={() => setPaused(false)}>
           เล่นต่อ

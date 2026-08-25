@@ -24,6 +24,9 @@ import { PauseMenu } from './screens/PauseMenu'
 import { GameAudio } from './audio/GameAudio'
 import { MenuAudio } from './audio/MenuAudio'
 import { SoundToggle } from './audio/SoundToggle'
+import { AdminButton } from './admin/AdminButton'
+import { AdminPanel } from './admin/AdminPanel'
+import { useAdminStore } from './admin/adminStore'
 import { useAuthStore } from './auth/authStore'
 import { useGameStore } from './game/store'
 import { loadSave } from './game/persistence'
@@ -39,12 +42,23 @@ function App() {
   const { session, loading, passwordRecovery } = useAuthStore()
   const hydrateSave = useGameStore((s) => s.hydrateSave)
   const resetSave = useGameStore((s) => s.resetSave)
+  const checkAdmin = useAdminStore((s) => s.checkAdmin)
+  const resetAdmin = useAdminStore((s) => s.reset)
   const saveLoaded = useGameStore((s) => s.saveLoaded)
   const characterClass = useGameStore((s) => s.characterClass)
   const characterName = useGameStore((s) => s.characterName)
   const currentLevel = useGameStore((s) => s.currentLevel)
   const difficulty = useGameStore((s) => s.difficulty)
   const phase = useGameStore((s) => s.phase)
+
+  // Asked once per session, alongside the save: the answer decides whether the
+  // admin console exists for this account at all. Cleared first so switching
+  // accounts on the same page never carries the previous one's answer over.
+  useEffect(() => {
+    resetAdmin()
+    if (!session) return
+    void checkAdmin()
+  }, [session, checkAdmin, resetAdmin])
 
   useEffect(() => {
     resetSave()
@@ -83,6 +97,13 @@ function App() {
   // login/register play the bright menu theme too, but without the toggle.
   let showSoundToggle = false
   let playMenuMusic = false
+  // The admin console rides along with the two screens that are "in the game
+  // proper" — the chapter intro and the dungeon itself. Not on the login,
+  // customize or difficulty screens, where warping to a level would mean
+  // nothing yet. Rendered at this level (not inside the dungeon) so warping
+  // from the chapter intro works too, and so the panel survives the remount
+  // that changing level causes.
+  let showAdminTools = false
 
   if (passwordRecovery) {
     // Overrides every other screen: the user got here via the "reset
@@ -138,6 +159,7 @@ function App() {
     )
     playMenuMusic = true
     showSoundToggle = true
+    showAdminTools = true
   } else {
     content = (
       <div className="app-root">
@@ -173,6 +195,7 @@ function App() {
       </div>
     )
     showSoundToggle = true
+    showAdminTools = true
   }
 
   return (
@@ -180,6 +203,12 @@ function App() {
       {playMenuMusic && <MenuAudio />}
       {content}
       {showSoundToggle && <SoundToggle />}
+      {showAdminTools && (
+        <>
+          <AdminButton />
+          <AdminPanel />
+        </>
+      )}
     </>
   )
 }
