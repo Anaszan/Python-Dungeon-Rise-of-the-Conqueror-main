@@ -231,26 +231,30 @@ const LEVEL_2_WALLS: Wall[] = [
   { x: -13, z: -45, width: WALL_THICKNESS, depth: 4 },
 ]
 
+// Like level 4, every monster here carries both a modelUrl and an imageUrl:
+// the GLB is a rigged low-poly model with a looping attack animation
+// (blender/build_monsters_level2.py) for the 3D dungeon, and the PNG is what
+// the plain-HTML combat screen can actually show in an <img>.
 const LEVEL_2_MONSTERS: MonsterData[] = [
   // main corridor
-  { id: 'goblin-warrior-1', name: 'Goblin Warrior', maxHp: 70, color: '#a8632f', attackDamage: 12, attackInterval: 10, position: [0, 0.5, -5], imageUrl: '/monsters/goblinwarrior_attack.png' },
-  { id: 'specter-1', name: 'Specter', maxHp: 60, color: '#b8d9f0', attackDamage: 14, attackInterval: 10, position: [0, 0.5, -19], imageUrl: '/monsters/ghostspecter_attack.png' },
-  { id: 'wraith-elite-1', name: 'Wraith Elite', maxHp: 120, color: '#5a3f8a', attackDamage: 18, attackInterval: 10, position: [0, 0.5, -33], imageUrl: '/monsters/wraithelite_attack.png' },
+  { id: 'goblin-warrior-1', name: 'Goblin Warrior', maxHp: 70, color: '#a8632f', attackDamage: 12, attackInterval: 10, position: [0, 0.5, -5], modelUrl: '/monsters/goblinwarrior_attack.glb', imageUrl: '/monsters/goblinwarrior_attack.png' },
+  { id: 'specter-1', name: 'Specter', maxHp: 60, color: '#b8d9f0', attackDamage: 14, attackInterval: 10, position: [0, 0.5, -19], modelUrl: '/monsters/ghostspecter_attack.glb', imageUrl: '/monsters/ghostspecter_attack.png' },
+  { id: 'wraith-elite-1', name: 'Wraith Elite', maxHp: 120, color: '#5a3f8a', attackDamage: 18, attackInterval: 10, position: [0, 0.5, -33], modelUrl: '/monsters/wraithelite_attack.glb', imageUrl: '/monsters/wraithelite_attack.png' },
 
   // west branch room
-  { id: 'orc-1', name: 'Orc', maxHp: 90, color: '#5c7a3d', attackDamage: 15, attackInterval: 10, position: [-5, 0.5, -11], imageUrl: '/monsters/orc_attack.png' },
-  { id: 'orc-2', name: 'Orc Berserker', maxHp: 90, color: '#4a6a2f', attackDamage: 15, attackInterval: 10, position: [-7, 0.5, -14], imageUrl: '/monsters/orc_attack.png' },
+  { id: 'orc-1', name: 'Orc', maxHp: 90, color: '#5c7a3d', attackDamage: 15, attackInterval: 10, position: [-5, 0.5, -11], modelUrl: '/monsters/orc_attack.glb', imageUrl: '/monsters/orc_attack.png' },
+  { id: 'orc-2', name: 'Orc Berserker', maxHp: 90, color: '#4a6a2f', attackDamage: 15, attackInterval: 10, position: [-7, 0.5, -14], modelUrl: '/monsters/orcberserker_attack.glb', imageUrl: '/monsters/orc_attack.png' },
 
   // east branch room
-  { id: 'goblin-warrior-2', name: 'Goblin Marauder', maxHp: 70, color: '#b8763a', attackDamage: 12, attackInterval: 10, position: [5, 0.5, -23], imageUrl: '/monsters/goblinmarauder_attack.png' },
-  { id: 'specter-2', name: 'Wisp Specter', maxHp: 60, color: '#9fc9e8', attackDamage: 14, attackInterval: 10, position: [7, 0.5, -26], imageUrl: '/monsters/wispspecter_attack.png' },
+  { id: 'goblin-warrior-2', name: 'Goblin Marauder', maxHp: 70, color: '#b8763a', attackDamage: 12, attackInterval: 10, position: [5, 0.5, -23], modelUrl: '/monsters/goblinmarauder_attack.glb', imageUrl: '/monsters/goblinmarauder_attack.png' },
+  { id: 'specter-2', name: 'Wisp Specter', maxHp: 60, color: '#9fc9e8', attackDamage: 14, attackInterval: 10, position: [7, 0.5, -26], modelUrl: '/monsters/wispspecter_attack.glb', imageUrl: '/monsters/wispspecter_attack.png' },
 
   // end room
-  { id: 'wraith-elite-2', name: 'Wraith Sovereign', maxHp: 120, color: '#4a3570', attackDamage: 18, attackInterval: 10, position: [-4, 0.5, -45], imageUrl: '/monsters/wraithsovereign_attack.png' },
-  { id: 'elder-dragon-1', name: 'Elder Dragon', maxHp: 260, color: '#c21f3a', attackDamage: 28, attackInterval: 10, position: [4, 0.5, -46], imageUrl: '/monsters/elderdragon_attack.png' },
+  { id: 'wraith-elite-2', name: 'Wraith Sovereign', maxHp: 120, color: '#4a3570', attackDamage: 18, attackInterval: 10, position: [-4, 0.5, -45], modelUrl: '/monsters/wraithsovereign_attack.glb', imageUrl: '/monsters/wraithsovereign_attack.png' },
+  { id: 'elder-dragon-1', name: 'Elder Dragon', maxHp: 260, color: '#c21f3a', attackDamage: 28, attackInterval: 10, position: [4, 0.5, -46], modelUrl: '/monsters/elderdragon_attack.glb', imageUrl: '/monsters/elderdragon_attack.png' },
 
   // vault room
-  { id: 'specter-3', name: 'Hollow Specter', maxHp: 60, color: '#7fb8d9', attackDamage: 14, attackInterval: 10, position: [-10, 0.5, -45], imageUrl: '/monsters/hollowspecter_attack.png' },
+  { id: 'specter-3', name: 'Hollow Specter', maxHp: 60, color: '#7fb8d9', attackDamage: 14, attackInterval: 10, position: [-10, 0.5, -45], modelUrl: '/monsters/hollowspecter_attack.glb', imageUrl: '/monsters/hollowspecter_attack.png' },
 ]
 
 const LEVEL_2_PICKUPS: PickupData[] = [
