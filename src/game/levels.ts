@@ -343,19 +343,23 @@ export const LEVEL_2: LevelData = {
 const LEVEL_3_REGIONS: Region[] = LEVEL_1_REGIONS
 const LEVEL_3_WALLS: Wall[] = LEVEL_1_WALLS
 
+// The loops chapter, so the cast repeats: the Loop Imp and the Skirmisher
+// land three jabs inside one clip, and the Hydra's three heads strike in
+// turn (blender/build_monsters_level3.py). Each monster keeps its SVG for
+// the plain-HTML combat screen, which cannot show a GLB.
 const LEVEL_3_MONSTERS: MonsterData[] = [
-  { id: 'imp-1', name: 'Imp', maxHp: 85, color: '#8fd35f', attackDamage: 16, attackInterval: 10, position: [0, 0.5, -4], imageUrl: '/monsters/imp_attack.svg' },
-  { id: 'imp-2', name: 'Loop Imp', maxHp: 85, color: '#6fd38f', attackDamage: 16, attackInterval: 10, position: [0, 0.5, -16], imageUrl: '/monsters/loopimp_attack.svg' },
-  { id: 'banshee-1', name: 'Banshee', maxHp: 150, color: '#b58fe8', attackDamage: 22, attackInterval: 10, position: [0, 0.5, -28], imageUrl: '/monsters/banshee_attack.svg' },
+  { id: 'imp-1', name: 'Imp', maxHp: 85, color: '#8fd35f', attackDamage: 16, attackInterval: 10, position: [0, 0.5, -4], modelUrl: '/monsters/imp_attack.glb', imageUrl: '/monsters/imp_attack.svg' },
+  { id: 'imp-2', name: 'Loop Imp', maxHp: 85, color: '#6fd38f', attackDamage: 16, attackInterval: 10, position: [0, 0.5, -16], modelUrl: '/monsters/loopimp_attack.glb', imageUrl: '/monsters/loopimp_attack.svg' },
+  { id: 'banshee-1', name: 'Banshee', maxHp: 150, color: '#b58fe8', attackDamage: 22, attackInterval: 10, position: [0, 0.5, -28], modelUrl: '/monsters/banshee_attack.glb', imageUrl: '/monsters/banshee_attack.svg' },
 
-  { id: 'raider-1', name: 'Goblin Raider', maxHp: 115, color: '#d1954b', attackDamage: 19, attackInterval: 10, position: [-4, 0.5, -8], imageUrl: '/monsters/goblin_attack.svg' },
-  { id: 'raider-2', name: 'Goblin Skirmisher', maxHp: 115, color: '#d1b04b', attackDamage: 19, attackInterval: 10, position: [-6.5, 0.5, -11], imageUrl: '/monsters/goblin_attack.svg' },
+  { id: 'raider-1', name: 'Goblin Raider', maxHp: 115, color: '#d1954b', attackDamage: 19, attackInterval: 10, position: [-4, 0.5, -8], modelUrl: '/monsters/goblinraider_attack.glb', imageUrl: '/monsters/goblin_attack.svg' },
+  { id: 'raider-2', name: 'Goblin Skirmisher', maxHp: 115, color: '#d1b04b', attackDamage: 19, attackInterval: 10, position: [-6.5, 0.5, -11], modelUrl: '/monsters/goblinskirmisher_attack.glb', imageUrl: '/monsters/goblin_attack.svg' },
 
-  { id: 'raider-3', name: 'Goblin Vanguard', maxHp: 115, color: '#b17a3a', attackDamage: 19, attackInterval: 10, position: [5, 0.5, -19], imageUrl: '/monsters/goblinvanguard_attack.svg' },
-  { id: 'banshee-2', name: 'Wailing Banshee', maxHp: 150, color: '#9f7fe8', attackDamage: 22, attackInterval: 10, position: [7, 0.5, -21], imageUrl: '/monsters/banshee_attack.svg' },
+  { id: 'raider-3', name: 'Goblin Vanguard', maxHp: 115, color: '#b17a3a', attackDamage: 19, attackInterval: 10, position: [5, 0.5, -19], modelUrl: '/monsters/goblinvanguard_attack.glb', imageUrl: '/monsters/goblinvanguard_attack.svg' },
+  { id: 'banshee-2', name: 'Wailing Banshee', maxHp: 150, color: '#9f7fe8', attackDamage: 22, attackInterval: 10, position: [7, 0.5, -21], modelUrl: '/monsters/wailingbanshee_attack.glb', imageUrl: '/monsters/banshee_attack.svg' },
 
-  { id: 'banshee-3', name: 'Shrieking Banshee', maxHp: 150, color: '#c7a8f0', attackDamage: 22, attackInterval: 10, position: [-3, 0.5, -37], imageUrl: '/monsters/banshee_attack.svg' },
-  { id: 'hydra-1', name: 'Hydra', maxHp: 300, color: '#e0524f', attackDamage: 32, attackInterval: 10, position: [3, 0.5, -37], imageUrl: '/monsters/hydra_attack.svg' },
+  { id: 'banshee-3', name: 'Shrieking Banshee', maxHp: 150, color: '#c7a8f0', attackDamage: 22, attackInterval: 10, position: [-3, 0.5, -37], modelUrl: '/monsters/shriekingbanshee_attack.glb', imageUrl: '/monsters/banshee_attack.svg' },
+  { id: 'hydra-1', name: 'Hydra', maxHp: 300, color: '#e0524f', attackDamage: 32, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/hydra_attack.glb', imageUrl: '/monsters/hydra_attack.svg' },
 ]
 
 const LEVEL_3_PICKUPS: PickupData[] = [
@@ -422,11 +426,11 @@ export const LEVEL_3: LevelData = {
 const LEVEL_4_REGIONS: Region[] = LEVEL_2_REGIONS
 const LEVEL_4_WALLS: Wall[] = LEVEL_2_WALLS
 
-// Level 4 is the only level whose art ships as GLB. The 3D scene prefers
-// modelUrl, but the combat screen is plain HTML and can only show an <img> —
-// so each monster also carries the imageUrl of the PNG that was baked into
-// its own GLB (extracted from the file's embedded texture, so the two views
-// show identical art).
+// Level 4's GLBs are flat planes baked from 2D art, unlike the rigged models
+// levels 1-3 ship. The 3D scene prefers modelUrl, but the combat screen is
+// plain HTML and can only show an <img> — so each monster also carries the
+// imageUrl of the PNG that was baked into its own GLB (extracted from the
+// file's embedded texture, so the two views show identical art).
 const LEVEL_4_MONSTERS: MonsterData[] = [
   { id: 'wisp-1', name: 'Arcane Wisp', maxHp: 95, color: '#8fc7e8', attackDamage: 16, attackInterval: 10, position: [0, 0.5, -5], modelUrl: '/monsters/arcanewisp_attack.glb', imageUrl: '/monsters/arcanewisp_attack.png' },
   { id: 'hexsprite-1', name: 'Hex Sprite', maxHp: 80, color: '#c98fe8', attackDamage: 18, attackInterval: 10, position: [0, 0.5, -19], modelUrl: '/monsters/hexsprite_attack.glb', imageUrl: '/monsters/hexsprite_attack.png' },

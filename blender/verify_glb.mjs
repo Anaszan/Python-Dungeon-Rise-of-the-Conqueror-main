@@ -4,8 +4,14 @@ import { readFileSync } from 'node:fs'
 import { AnimationMixer, LoopRepeat, PropertyBinding } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
-const names = ['goblinwarrior', 'goblinmarauder', 'orc', 'orcberserker', 'ghostspecter',
-  'wispspecter', 'hollowspecter', 'wraithelite', 'wraithsovereign', 'elderdragon']
+const names = [
+  // level 2
+  'goblinwarrior', 'goblinmarauder', 'orc', 'orcberserker', 'ghostspecter',
+  'wispspecter', 'hollowspecter', 'wraithelite', 'wraithsovereign', 'elderdragon',
+  // level 3
+  'imp', 'loopimp', 'goblinraider', 'goblinskirmisher', 'goblinvanguard',
+  'banshee', 'wailingbanshee', 'shriekingbanshee', 'hydra',
+]
 const loader = new GLTFLoader()
 let bad = 0
 

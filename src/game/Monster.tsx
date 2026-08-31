@@ -104,7 +104,9 @@ export function Monster({ data }: { data: MonsterData }) {
   const defeated = useGameStore((s) => s.defeatedIds.has(data.id))
   if (defeated) return null
 
-  const scale = data.name === 'Elder Dragon' ? 1.8 : data.name === 'Dragon' ? 1.5 : 1
+  // The three end-of-level bosses stand taller than the cast they close out.
+  const scale =
+    data.name === 'Elder Dragon' ? 1.8 : data.name === 'Hydra' ? 1.6 : data.name === 'Dragon' ? 1.5 : 1
   const placeholder = <MonsterShape color={data.color} scale={scale} />
 
   return (
