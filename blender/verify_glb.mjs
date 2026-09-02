@@ -1,4 +1,4 @@
-// Loads each level 2 GLB the way the game does and checks the clip actually
+// Loads each rigged GLB the way the game does and checks the clip actually
 // binds to the rig: every track has to resolve to a node inside the model.
 import { readFileSync } from 'node:fs'
 import { AnimationMixer, LoopRepeat, PropertyBinding } from 'three'
@@ -11,6 +11,13 @@ const names = [
   // level 3
   'imp', 'loopimp', 'goblinraider', 'goblinskirmisher', 'goblinvanguard',
   'banshee', 'wailingbanshee', 'shriekingbanshee', 'hydra',
+  // level 4
+  'arcanewisp', 'functionwisp', 'hexsprite', 'heximp', 'cursesprite',
+  'cultist', 'cultistzealot', 'spellknight', 'spellwarden', 'archmage',
+  // level 5
+  'bookgolem', 'indexgolem', 'ghostlibrarian', 'whisperinglibrarian',
+  'silentlibrarian', 'archivist', 'archivistscribe', 'archivistwarden',
+  'forbiddentome',
 ]
 const loader = new GLTFLoader()
 let bad = 0

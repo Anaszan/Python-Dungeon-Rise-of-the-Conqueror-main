@@ -426,11 +426,12 @@ export const LEVEL_3: LevelData = {
 const LEVEL_4_REGIONS: Region[] = LEVEL_2_REGIONS
 const LEVEL_4_WALLS: Wall[] = LEVEL_2_WALLS
 
-// Level 4's GLBs are flat planes baked from 2D art, unlike the rigged models
-// levels 1-3 ship. The 3D scene prefers modelUrl, but the combat screen is
-// plain HTML and can only show an <img> — so each monster also carries the
-// imageUrl of the PNG that was baked into its own GLB (extracted from the
-// file's embedded texture, so the two views show identical art).
+// The functions chapter, so the whole cast is built around call-and-return:
+// every caster here throws a bolt out on the beat and catches it coming back
+// inside the same one-second clip, and the Function Wisp pulls three arguments
+// into its core to make the call (blender/build_monsters_level4.py). Each
+// monster keeps the PNG it used to be for the combat screen, which is plain
+// HTML and can only show an <img>.
 const LEVEL_4_MONSTERS: MonsterData[] = [
   { id: 'wisp-1', name: 'Arcane Wisp', maxHp: 95, color: '#8fc7e8', attackDamage: 16, attackInterval: 10, position: [0, 0.5, -5], modelUrl: '/monsters/arcanewisp_attack.glb', imageUrl: '/monsters/arcanewisp_attack.png' },
   { id: 'hexsprite-1', name: 'Hex Sprite', maxHp: 80, color: '#c98fe8', attackDamage: 18, attackInterval: 10, position: [0, 0.5, -19], modelUrl: '/monsters/hexsprite_attack.glb', imageUrl: '/monsters/hexsprite_attack.png' },
@@ -522,19 +523,26 @@ export const LEVEL_4: LevelData = {
 const LEVEL_5_REGIONS: Region[] = LEVEL_1_REGIONS
 const LEVEL_5_WALLS: Wall[] = LEVEL_1_WALLS
 
+// The file-handling chapter, so the whole cast performs the three beats the
+// chapter teaches, once a second: the covers swing open, something comes off
+// the page, and they snap shut again (blender/build_monsters_level5.py). The
+// librarians and the Tome carry a real book with hinged covers to do it with;
+// the golems open their own chest instead, and the archivists are the ones
+// doing the writing. Each monster keeps its PNG for the combat screen, which
+// is plain HTML and can only show an <img>.
 const LEVEL_5_MONSTERS: MonsterData[] = [
-  { id: 'bookgolem-1', name: 'Book Golem', maxHp: 115, color: '#7a6a4f', attackDamage: 20, attackInterval: 10, position: [0, 0.5, -4], imageUrl: '/monsters/BookGolem.png' },
-  { id: 'bookgolem-2', name: 'Index Golem', maxHp: 115, color: '#8a7a5f', attackDamage: 20, attackInterval: 10, position: [0, 0.5, -16], imageUrl: '/monsters/02_IndexGolem.png' },
-  { id: 'ghostlib-1', name: 'Ghost Librarian', maxHp: 200, color: '#cfd8f0', attackDamage: 26, attackInterval: 10, position: [0, 0.5, -28], imageUrl: '/monsters/03_GhostLibrarian.png' },
+  { id: 'bookgolem-1', name: 'Book Golem', maxHp: 115, color: '#7a6a4f', attackDamage: 20, attackInterval: 10, position: [0, 0.5, -4], modelUrl: '/monsters/bookgolem_attack.glb', imageUrl: '/monsters/BookGolem.png' },
+  { id: 'bookgolem-2', name: 'Index Golem', maxHp: 115, color: '#8a7a5f', attackDamage: 20, attackInterval: 10, position: [0, 0.5, -16], modelUrl: '/monsters/indexgolem_attack.glb', imageUrl: '/monsters/02_IndexGolem.png' },
+  { id: 'ghostlib-1', name: 'Ghost Librarian', maxHp: 200, color: '#cfd8f0', attackDamage: 26, attackInterval: 10, position: [0, 0.5, -28], modelUrl: '/monsters/ghostlibrarian_attack.glb', imageUrl: '/monsters/03_GhostLibrarian.png' },
 
-  { id: 'archivist-1', name: 'Archivist', maxHp: 155, color: '#4f7a6a', attackDamage: 23, attackInterval: 10, position: [-4, 0.5, -8], imageUrl: '/monsters/04_Archivist.png' },
-  { id: 'archivist-2', name: 'Archivist Scribe', maxHp: 155, color: '#5f8a7a', attackDamage: 23, attackInterval: 10, position: [-6.5, 0.5, -11], imageUrl: '/monsters/05_ArchivistScribe.png' },
+  { id: 'archivist-1', name: 'Archivist', maxHp: 155, color: '#4f7a6a', attackDamage: 23, attackInterval: 10, position: [-4, 0.5, -8], modelUrl: '/monsters/archivist_attack.glb', imageUrl: '/monsters/04_Archivist.png' },
+  { id: 'archivist-2', name: 'Archivist Scribe', maxHp: 155, color: '#5f8a7a', attackDamage: 23, attackInterval: 10, position: [-6.5, 0.5, -11], modelUrl: '/monsters/archivistscribe_attack.glb', imageUrl: '/monsters/05_ArchivistScribe.png' },
 
-  { id: 'archivist-3', name: 'Archivist Warden', maxHp: 155, color: '#3f6a5a', attackDamage: 23, attackInterval: 10, position: [5, 0.5, -19], imageUrl: '/monsters/06_ArchivistWarden.png' },
-  { id: 'ghostlib-2', name: 'Whispering Librarian', maxHp: 200, color: '#b8c7e8', attackDamage: 26, attackInterval: 10, position: [7, 0.5, -21], imageUrl: '/monsters/07_WhisperingLibrarian.png' },
+  { id: 'archivist-3', name: 'Archivist Warden', maxHp: 155, color: '#3f6a5a', attackDamage: 23, attackInterval: 10, position: [5, 0.5, -19], modelUrl: '/monsters/archivistwarden_attack.glb', imageUrl: '/monsters/06_ArchivistWarden.png' },
+  { id: 'ghostlib-2', name: 'Whispering Librarian', maxHp: 200, color: '#b8c7e8', attackDamage: 26, attackInterval: 10, position: [7, 0.5, -21], modelUrl: '/monsters/whisperinglibrarian_attack.glb', imageUrl: '/monsters/07_WhisperingLibrarian.png' },
 
-  { id: 'ghostlib-3', name: 'Silent Librarian', maxHp: 200, color: '#e0e8f8', attackDamage: 26, attackInterval: 10, position: [-3, 0.5, -37], imageUrl: '/monsters/08_SilentLibrarian.png' },
-  { id: 'tome-1', name: 'Forbidden Tome', maxHp: 380, color: '#3a2a66', attackDamage: 38, attackInterval: 10, position: [3, 0.5, -37], imageUrl: '/monsters/09_ForbiddenTome.png' },
+  { id: 'ghostlib-3', name: 'Silent Librarian', maxHp: 200, color: '#e0e8f8', attackDamage: 26, attackInterval: 10, position: [-3, 0.5, -37], modelUrl: '/monsters/silentlibrarian_attack.glb', imageUrl: '/monsters/08_SilentLibrarian.png' },
+  { id: 'tome-1', name: 'Forbidden Tome', maxHp: 380, color: '#3a2a66', attackDamage: 38, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/forbiddentome_attack.glb', imageUrl: '/monsters/09_ForbiddenTome.png' },
 ]
 
 const LEVEL_5_PICKUPS: PickupData[] = [
