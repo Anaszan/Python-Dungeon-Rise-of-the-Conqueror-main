@@ -101,32 +101,59 @@ class MonsterArtBoundary extends Component<{ fallback: ReactNode; children: Reac
   }
 }
 
+// The three end-of-level bosses stand taller than the cast they close out.
+// Not exported: the battle screen frames one monster at a time and wants them
+// all the same size (see MonsterPortrait), and a non-component export here
+// would cost this file its fast refresh.
+function monsterScale(name: string): number {
+  if (name === 'Elder Dragon') return 1.8
+  if (name === 'Hydra') return 1.6
+  if (name === 'Dragon') return 1.5
+  return 1
+}
+
+// One monster's art as three.js objects, with its own fallback chain: the GLB
+// model when it has one, the flat sprite when it doesn't (or when the model
+// fails to load), and a colored blob when neither works.
+//
+// Shared by the dungeon (Monster, below) and by the battle screen
+// (MonsterPortrait) — which is the whole reason it is a component of its own.
+// A monster that a player met in the corridor should be the same creature,
+// animation and all, when the fight screen opens on it.
+//
+// Every boundary/Suspense pair has to live on this side of the <Canvas>: an
+// asset failure throws inside the canvas's own React root, so a boundary
+// mounted around <Canvas> in ordinary DOM would never see it.
+export function MonsterArt({ data, scale = 1 }: { data: MonsterData; scale?: number }) {
+  const placeholder = <MonsterShape color={data.color} scale={scale} />
+  const sprite = data.imageUrl ? (
+    <MonsterArtBoundary fallback={placeholder}>
+      <Suspense fallback={placeholder}>
+        <MonsterSprite url={data.imageUrl} scale={scale} />
+      </Suspense>
+    </MonsterArtBoundary>
+  ) : (
+    placeholder
+  )
+
+  if (!data.modelUrl) return sprite
+
+  return (
+    <MonsterArtBoundary fallback={sprite}>
+      <Suspense fallback={placeholder}>
+        <MonsterModel url={data.modelUrl} scale={scale} />
+      </Suspense>
+    </MonsterArtBoundary>
+  )
+}
+
 export function Monster({ data }: { data: MonsterData }) {
   const defeated = useGameStore((s) => s.defeatedIds.has(data.id))
   if (defeated) return null
 
-  // The three end-of-level bosses stand taller than the cast they close out.
-  const scale =
-    data.name === 'Elder Dragon' ? 1.8 : data.name === 'Hydra' ? 1.6 : data.name === 'Dragon' ? 1.5 : 1
-  const placeholder = <MonsterShape color={data.color} scale={scale} />
-
   return (
     <group position={data.position}>
-      {data.modelUrl ? (
-        <MonsterArtBoundary fallback={placeholder}>
-          <Suspense fallback={placeholder}>
-            <MonsterModel url={data.modelUrl} scale={scale} />
-          </Suspense>
-        </MonsterArtBoundary>
-      ) : data.imageUrl ? (
-        <MonsterArtBoundary fallback={placeholder}>
-          <Suspense fallback={placeholder}>
-            <MonsterSprite url={data.imageUrl} scale={scale} />
-          </Suspense>
-        </MonsterArtBoundary>
-      ) : (
-        placeholder
-      )}
+      <MonsterArt data={data} scale={monsterScale(data.name)} />
     </group>
   )
 }

@@ -200,11 +200,16 @@ canvas {
   border-radius: 50%;
 }
 
-/* The player's side is a live 3D canvas rather than a sprite, so it fills
-   its cell instead of sitting on the baseline like an image does. */
-.battle-sprite-player canvas {
+/* Both sides are live 3D canvases rather than sprites (CharacterPortrait and
+   MonsterPortrait), so they fill their cell instead of sitting on the baseline
+   like an image does. */
+.battle-sprite canvas {
   position: relative;
   z-index: 1;
+}
+
+.battle-sprite-enemy canvas {
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
 }
 
 /* Pool of light each combatant stands in — sells the two of them as being
@@ -294,6 +299,7 @@ canvas {
    toward the opponent and a recoil is knocked back away from them. */
 
 /* Player just hit the monster: it recoils up-right and whitens for an instant. */
+.battle-sprite-enemy.recoil canvas,
 .battle-sprite-enemy.recoil img,
 .battle-sprite-enemy.recoil .battle-sprite-fallback {
   animation: enemy-recoil 0.3s ease;
@@ -315,6 +321,7 @@ canvas {
 }
 
 /* The monster just landed its own attack: it dives down-left at the player. */
+.battle-sprite-enemy.lunge canvas,
 .battle-sprite-enemy.lunge img,
 .battle-sprite-enemy.lunge .battle-sprite-fallback {
   animation: enemy-lunge 0.3s ease;
@@ -375,6 +382,7 @@ canvas {
 }
 
 /* Defeat: the monster drops out of frame instead of just freezing at 0 HP. */
+.battle-sprite-enemy.fainted canvas,
 .battle-sprite-enemy.fainted img,
 .battle-sprite-enemy.fainted .battle-sprite-fallback {
   animation: enemy-faint 0.6s ease forwards;

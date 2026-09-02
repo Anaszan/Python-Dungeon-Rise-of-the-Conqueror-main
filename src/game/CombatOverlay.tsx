@@ -5,6 +5,7 @@ import { LESSONS } from './lessons'
 import { PLAYER_MAX_HP } from './constants'
 import { Mentor } from '../components/Mentor'
 import { SpellConsole } from './SpellConsole'
+import { MonsterPortrait } from './MonsterPortrait'
 import { DEFAULT_CHARACTER_CLASS } from '../character/characterOptions'
 import { CharacterPortrait } from '../character/CharacterPortrait'
 import { DEFAULT_DIFFICULTY, difficultyLabel } from './difficulty'
@@ -128,11 +129,9 @@ export function CombatOverlay() {
             className={`battle-sprite battle-sprite-enemy${monsterHit ? ' recoil' : ''}${playerHit ? ' lunge' : ''}${defeated ? ' fainted' : ''}`}
           >
             <div className="battle-platform" />
-            {monster.imageUrl ? (
-              <img src={monster.imageUrl} alt={monster.name} />
-            ) : (
-              <div className="battle-sprite-fallback" style={{ background: monster.color }} />
-            )}
+            {/* The monster's own 3D model, same as the dungeon renders — see
+                MonsterPortrait for why this is not an <img> any more. */}
+            <MonsterPortrait monster={monster} />
           </div>
 
           <div

@@ -63,15 +63,31 @@ describe('campaign', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('gives every monster a 2D sprite for the combat screen', () => {
-    // CombatOverlay is plain HTML: it renders monster.imageUrl in an <img>
-    // and falls back to a flat colored circle when it is missing. modelUrl
-    // does not help there — an <img> cannot show a GLB — so a monster with
-    // only a model (as all of level 4 once had) turns into a blob the moment
-    // the fight starts, even though it looks right out in the dungeon.
+  it('gives every monster a 2D sprite to fall back to', () => {
+    // Both the dungeon and the battle screen draw the GLB now (MonsterArt),
+    // so imageUrl is no longer what the fight looks at first — but it is the
+    // whole fallback chain: a model that fails to load leaves a monster with
+    // nothing but a colored blob in both places if it has no sprite either.
     for (const monster of ALL_MONSTERS) {
       expect(monster.imageUrl, `${monster.name} has no imageUrl`).toBeTruthy()
     }
+  })
+
+  it('gives every monster its own 3D model, not a borrowed one', () => {
+    // The battle screen renders the model now, which is what finally made the
+    // shared *sprites* visible as a bug (Orc Berserker wearing the Orc's
+    // picture, all three Banshees the same). Sprites are still allowed to be
+    // shared — they are only a fallback — but two monsters pointing at one
+    // model would put that duplication straight back on screen.
+    const withModel = ALL_MONSTERS.filter((m) => m.modelUrl)
+    expect(withModel, 'every monster should ship a GLB model').toHaveLength(ALL_MONSTERS.length)
+
+    const byModel = new Map<string, string[]>()
+    for (const monster of withModel) {
+      byModel.set(monster.modelUrl!, [...(byModel.get(monster.modelUrl!) ?? []), monster.name])
+    }
+    const shared = [...byModel.entries()].filter(([, names]) => names.length > 1)
+    expect(shared.map(([url, names]) => `${url}: ${names.join(', ')}`)).toEqual([])
   })
 
   it('ships every art file it points at', () => {
