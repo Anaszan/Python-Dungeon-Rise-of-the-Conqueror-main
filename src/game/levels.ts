@@ -615,27 +615,34 @@ export const LEVEL_5: LevelData = {
 const LEVEL_6_REGIONS: Region[] = LEVEL_2_REGIONS
 const LEVEL_6_WALLS: Wall[] = LEVEL_2_WALLS
 
-// Art note: this level ships its own set (public/monsters/01_..10_*.png), one
-// piece per monster name. Shattered Golem is the single exception — its
-// 08_ShatteredGolem.png is an opaque, watermarked square with no alpha
-// channel, so it would render as a photo tile rather than a cut-out sprite;
-// it borrows its tier-mate Broken Golem's art instead, the same way level 2's
-// two orcs and level 3's three banshees share one image.
+// The error-handling chapter, so every monster's attack goes wrong on purpose:
+// something breaks off at the moment of contact — a chest plate, a blade, a
+// misfired bolt, a run of the wyrm's own spine — and snaps back into place
+// before the clip repeats (blender/build_monsters_level6.py). The raise and the
+// catch, once a second, on everything in the room.
+//
+// Art note: this level ships its own sprite set (public/monsters/01_..10_*.png),
+// one piece per monster name. Shattered Golem is the single exception — its
+// 08_ShatteredGolem.png is an opaque, watermarked square with no alpha channel,
+// so it would render as a photo tile rather than a cut-out sprite; it borrows
+// its tier-mate Broken Golem's art instead, the same way level 2's two orcs and
+// level 3's three banshees share one image. That sharing is the sprite only:
+// the two golems have models of their own.
 const LEVEL_6_MONSTERS: MonsterData[] = [
-  { id: 'trapsprite-1', name: 'Trap Sprite', maxHp: 125, color: '#e8c78f', attackDamage: 21, attackInterval: 10, position: [0, 0.5, -5], armor: 0, imageUrl: '/monsters/01_TrapSprite.png' },
-  { id: 'cursedwisp-1', name: 'Cursed Wisp', maxHp: 105, color: '#7a2f2f', attackDamage: 23, attackInterval: 10, position: [0, 0.5, -19], armor: 0, imageUrl: '/monsters/02_CursedWisp.png' },
-  { id: 'brokengolem-1', name: 'Broken Golem', maxHp: 210, color: '#5a5248', attackDamage: 28, attackInterval: 10, position: [0, 0.5, -33], armor: 0, imageUrl: '/monsters/03_BrokenGolem.png' },
+  { id: 'trapsprite-1', name: 'Trap Sprite', maxHp: 125, color: '#e8c78f', attackDamage: 21, attackInterval: 10, position: [0, 0.5, -5], armor: 0, modelUrl: '/monsters/trapsprite_attack.glb', imageUrl: '/monsters/01_TrapSprite.png' },
+  { id: 'cursedwisp-1', name: 'Cursed Wisp', maxHp: 105, color: '#7a2f2f', attackDamage: 23, attackInterval: 10, position: [0, 0.5, -19], armor: 0, modelUrl: '/monsters/cursedwisp_attack.glb', imageUrl: '/monsters/02_CursedWisp.png' },
+  { id: 'brokengolem-1', name: 'Broken Golem', maxHp: 210, color: '#5a5248', attackDamage: 28, attackInterval: 10, position: [0, 0.5, -33], armor: 0, modelUrl: '/monsters/brokengolem_attack.glb', imageUrl: '/monsters/03_BrokenGolem.png' },
 
-  { id: 'cursedknight-1', name: 'Cursed Knight', maxHp: 155, color: '#3a2a2a', attackDamage: 24, attackInterval: 10, position: [-5, 0.5, -11], armor: 0, imageUrl: '/monsters/04_CursedKnight.png' },
-  { id: 'cursedknight-2', name: 'Fallen Knight', maxHp: 155, color: '#2a1a1a', attackDamage: 24, attackInterval: 10, position: [-7, 0.5, -14], armor: 0, imageUrl: '/monsters/05_FallenKnight.png' },
+  { id: 'cursedknight-1', name: 'Cursed Knight', maxHp: 155, color: '#3a2a2a', attackDamage: 24, attackInterval: 10, position: [-5, 0.5, -11], armor: 0, modelUrl: '/monsters/cursedknight_attack.glb', imageUrl: '/monsters/04_CursedKnight.png' },
+  { id: 'cursedknight-2', name: 'Fallen Knight', maxHp: 155, color: '#2a1a1a', attackDamage: 24, attackInterval: 10, position: [-7, 0.5, -14], armor: 0, modelUrl: '/monsters/fallenknight_attack.glb', imageUrl: '/monsters/05_FallenKnight.png' },
 
-  { id: 'trapsprite-2', name: 'Snare Sprite', maxHp: 125, color: '#e8a76f', attackDamage: 21, attackInterval: 10, position: [5, 0.5, -23], armor: 0, imageUrl: '/monsters/06_SnareSprite.png' },
-  { id: 'cursedwisp-2', name: 'Hex Wisp', maxHp: 105, color: '#8a3f3f', attackDamage: 23, attackInterval: 10, position: [7, 0.5, -26], armor: 0, imageUrl: '/monsters/07_HexWisp.png' },
+  { id: 'trapsprite-2', name: 'Snare Sprite', maxHp: 125, color: '#e8a76f', attackDamage: 21, attackInterval: 10, position: [5, 0.5, -23], armor: 0, modelUrl: '/monsters/snaresprite_attack.glb', imageUrl: '/monsters/06_SnareSprite.png' },
+  { id: 'cursedwisp-2', name: 'Hex Wisp', maxHp: 105, color: '#8a3f3f', attackDamage: 23, attackInterval: 10, position: [7, 0.5, -26], armor: 0, modelUrl: '/monsters/hexwisp_attack.glb', imageUrl: '/monsters/07_HexWisp.png' },
 
-  { id: 'brokengolem-2', name: 'Shattered Golem', maxHp: 210, color: '#4a4238', attackDamage: 28, attackInterval: 10, position: [-4, 0.5, -45], armor: 0, imageUrl: '/monsters/03_BrokenGolem.png' },
-  { id: 'glitchwyrm-1', name: 'Glitch Wyrm', maxHp: 430, color: '#ff2e63', attackDamage: 42, attackInterval: 10, position: [4, 0.5, -46], armor: 0, imageUrl: '/monsters/09_GlitchWyrm.png' },
+  { id: 'brokengolem-2', name: 'Shattered Golem', maxHp: 210, color: '#4a4238', attackDamage: 28, attackInterval: 10, position: [-4, 0.5, -45], armor: 0, modelUrl: '/monsters/shatteredgolem_attack.glb', imageUrl: '/monsters/03_BrokenGolem.png' },
+  { id: 'glitchwyrm-1', name: 'Glitch Wyrm', maxHp: 430, color: '#ff2e63', attackDamage: 42, attackInterval: 10, position: [4, 0.5, -46], armor: 0, modelUrl: '/monsters/glitchwyrm_attack.glb', imageUrl: '/monsters/09_GlitchWyrm.png' },
 
-  { id: 'cursedwisp-3', name: 'Blight Wisp', maxHp: 105, color: '#a34f4f', attackDamage: 23, attackInterval: 10, position: [-10, 0.5, -45], armor: 0, imageUrl: '/monsters/10_BlightWisp.png' },
+  { id: 'cursedwisp-3', name: 'Blight Wisp', maxHp: 105, color: '#a34f4f', attackDamage: 23, attackInterval: 10, position: [-10, 0.5, -45], armor: 0, modelUrl: '/monsters/blightwisp_attack.glb', imageUrl: '/monsters/10_BlightWisp.png' },
 ]
 
 const LEVEL_6_PICKUPS: PickupData[] = [

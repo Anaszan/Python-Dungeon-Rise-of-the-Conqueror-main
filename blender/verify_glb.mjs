@@ -18,6 +18,9 @@ const names = [
   'bookgolem', 'indexgolem', 'ghostlibrarian', 'whisperinglibrarian',
   'silentlibrarian', 'archivist', 'archivistscribe', 'archivistwarden',
   'forbiddentome',
+  // level 6
+  'trapsprite', 'snaresprite', 'cursedwisp', 'hexwisp', 'blightwisp',
+  'brokengolem', 'shatteredgolem', 'cursedknight', 'fallenknight', 'glitchwyrm',
 ]
 const loader = new GLTFLoader()
 let bad = 0

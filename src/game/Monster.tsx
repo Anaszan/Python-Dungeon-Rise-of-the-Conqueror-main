@@ -26,9 +26,10 @@ function MonsterSprite({ url, scale }: { url: string; scale: number }) {
 }
 
 // Every GLB monster here is X-centered with its base at local y=0 and its top
-// at or below local y=2. The remaining older files are flat planes baked from
-// 2D art (zero depth); levels 1-5 are solid low-poly models built in Blender
-// (sources under blender/). Normalizing against that fixed y=2 raw height lets
+// at or below local y=2. Every level's models are now solid low-poly models
+// built in Blender (sources under blender/); a handful of unused files in
+// public/monsters are still the old flat planes baked from 2D art (zero depth),
+// and would drop in the same way if anything pointed at them again. Normalizing against that fixed y=2 raw height lets
 // either kind drop in next to the plain image sprites at a matching on-screen
 // size without per-file tuning — and a deliberately short model (the slimes, at
 // y=1.25) reads as short on screen rather than being stretched to fill.
@@ -50,7 +51,7 @@ function MonsterModel({ url, scale }: { url: string; scale: number }) {
   const rig = useRef<Group>(null)
   const { actions, names } = useAnimations(animations, rig)
 
-  // Levels 2-5 ship a one-second attack loop (blender/build_monsters_level<n>.py);
+  // Levels 2-6 ship a one-second attack loop (blender/build_monsters_level<n>.py);
   // level 1's models are a single static pose and export no clips at all, so this
   // is a no-op for them. Every clip in the file is played, not just the first — a
   // model exported with its animation split per object arrives as one clip per
