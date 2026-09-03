@@ -116,6 +116,27 @@ function readRig(root: THREE.Object3D): Rig | null {
   }
 }
 
+// Exactly which rotation axes useProceduralGait writes, bone by bone, as the
+// node names arrive from GLTFLoader.
+//
+// This is a contract, not a note: an axis listed here is overwritten outright
+// every frame, so anything layering on top of the gait (character/cast.ts) can
+// safely *add* to it. An axis NOT listed here is never touched by the gait,
+// so adding to it every frame would compound the same offset until the limb
+// wound itself off — those axes have to be written from the bone's rest pose
+// instead. Add a line to the walk below and add its axis here.
+export const GAIT_DRIVEN_AXES: Record<string, readonly ('x' | 'y' | 'z')[]> = {
+  Torso: ['x', 'y'],
+  UpperArmL: ['x'],
+  UpperArmR: ['x'],
+  LowerArmL: ['x'],
+  LowerArmR: ['x'],
+  UpperLegL: ['x'],
+  UpperLegR: ['x'],
+  LowerLegL: ['x'],
+  LowerLegR: ['x'],
+}
+
 export function useProceduralGait(root: THREE.Object3D, enabled: boolean, moving: boolean) {
   const rig = useMemo(() => (enabled ? readRig(root) : null), [root, enabled])
   const phase = useRef(0)

@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { CHARACTER_ASSETS } from './characterAssets'
 import { CHARACTER_CLASS_OPTIONS, GENDER_OPTIONS } from './characterOptions'
+import { CAST_STYLES } from './cast'
+import type { CharacterClass } from './characterOptions'
 
 function publicPath(url: string) {
   return fileURLToPath(new URL(`../../public${url}`, import.meta.url))
@@ -108,6 +110,46 @@ describe('character models', () => {
         const joints = (skins[0]?.joints ?? []).map((index) => nodes[index].name)
         for (const bone of POSED_BONES) {
           expect(joints, `${where}: hand-posed gait needs a ${bone} bone`).toContain(bone)
+        }
+      }
+    }
+  })
+
+  // Same idea for the cast (character/cast.ts): every class casts by one of
+  // the two routes, and a model that supports neither would fire its spell
+  // standing perfectly still. Both routes are named against the model file, so
+  // nothing but this catches a renamed clip or a rig missing an arm.
+  it('can cast, by clip or by bone', () => {
+    // The hand-posed cast reaches further up the body than the gait does.
+    const CAST_BONES = [
+      'Torso',
+      'Chest',
+      'Head',
+      'Shoulder.R',
+      'UpperArm.R',
+      'LowerArm.R',
+      'Wrist.R',
+      'UpperArm.L',
+      'LowerArm.L',
+    ]
+
+    for (const [gender, classes] of Object.entries(CHARACTER_ASSETS)) {
+      for (const [cls, asset] of Object.entries(classes)) {
+        const { animations = [], skins = [], nodes = [] } = gltfJson(asset.glb)
+        const where = `${gender}/${cls}`
+        const style = CAST_STYLES[cls as CharacterClass]
+
+        if (animations.length > 0) {
+          expect(
+            animations.some((clip) => clip.name.endsWith(style.clip)),
+            `${where}: no ${style.clip} clip to cast with`,
+          ).toBe(true)
+          continue
+        }
+
+        const joints = (skins[0]?.joints ?? []).map((index) => nodes[index].name)
+        for (const bone of CAST_BONES) {
+          expect(joints, `${where}: hand-posed cast needs a ${bone} bone`).toContain(bone)
         }
       }
     }

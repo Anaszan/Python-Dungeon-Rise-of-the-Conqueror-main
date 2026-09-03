@@ -202,32 +202,33 @@ canvas {
     0 10px 34px rgba(0, 0, 0, 0.6),
     0 0 0 1px rgba(0, 0, 0, 0.4);
   color: var(--parchment-text);
-  /* Clear of the monster's own nameplate (132px wide, centred on the same
-     anchor), so the panel never covers the name of the thing it belongs to. */
-  transform: translate(74px, -50%);
+  /* --panel-gap is written per frame by TargetPanel: far enough out to clear
+     both the monster's own nameplate and the player standing at the centre of
+     the screen, and no further than the screen edge allows. The fallback is
+     the minimum the component would ever pick. */
+  transform: translate(var(--panel-gap, 74px), -50%);
   animation: target-panel-in 0.16s ease-out;
 }
 
-/* A target standing in the right half of the screen gets its panel on the
-   left instead — otherwise a fight near the right edge would push the code
-   boxes off it. TargetPanel decides which side per frame; this is the other
-   side's geometry. */
+/* Which side the panel hangs off is TargetPanel's call — away from the player
+   wherever it fits (see PLAYER_CLEARANCE there). This is the other side's
+   geometry. */
 .target-panel-flipped {
-  transform: translate(calc(-100% - 74px), -50%);
+  transform: translate(calc(-100% - var(--panel-gap, 74px)), -50%);
   animation-name: target-panel-in-flipped;
 }
 
 @keyframes target-panel-in {
   from {
     opacity: 0;
-    transform: translate(60px, -50%) scale(0.97);
+    transform: translate(calc(var(--panel-gap, 74px) - 14px), -50%) scale(0.97);
   }
 }
 
 @keyframes target-panel-in-flipped {
   from {
     opacity: 0;
-    transform: translate(calc(-100% - 60px), -50%) scale(0.97);
+    transform: translate(calc(-100% - var(--panel-gap, 74px) + 14px), -50%) scale(0.97);
   }
 }
 

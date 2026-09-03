@@ -14,6 +14,8 @@ import { canStandAt, hitsWall, isWalkable, type Region, type Wall } from './dung
 import { useGameStore } from './store'
 import { DEFAULT_CHARACTER_CLASS } from '../character/characterOptions'
 import { CharacterModel } from '../character/CharacterModel'
+import { CastAura } from '../character/CastAura'
+import { useCastSignal } from '../character/cast'
 
 export function Player({
   positionRef,
@@ -37,6 +39,10 @@ export function Player({
   const gender = useGameStore((s) => s.gender)
   const skinColor = useGameStore((s) => s.skinColor)
   const shirtColor = useGameStore((s) => s.shirtColor)
+  // The last spell that actually went off (TargetPanel fires it). This is the
+  // only player-side copy of the character that casts — the profile portrait
+  // passes nothing and just stands there.
+  const cast = useCastSignal()
 
   useFrame((_, delta) => {
     const state = useGameStore.getState()
@@ -99,7 +105,11 @@ export function Player({
         distance={LANTERN_RADIUS}
         decay={LIGHT_DECAY}
       />
-      <CharacterModel appearance={{ characterClass, gender, skinColor, shirtColor }} moving={walking} />
+      <CharacterModel appearance={{ characterClass, gender, skinColor, shirtColor }} moving={walking} cast={cast} />
+      {/* The glow and the rune ring that go with the pose. Inside the same
+          group, so a cast that carries on while the player walks travels with
+          them instead of being left behind on the floor. */}
+      <CastAura characterClass={characterClass} cast={cast} />
     </group>
   )
 }

@@ -1,4 +1,4 @@
-import { Component, Suspense, useMemo, useRef, type ReactNode } from 'react'
+import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
@@ -8,6 +8,7 @@ import { DEFAULT_GENDER } from './characterOptions'
 import { CHARACTER_ASSETS, type ClassAsset } from './characterAssets'
 import { getRecoloredShirtMap } from './shirtTexture'
 import { GAIT_CYCLES_PER_SECOND, useClipGait, useProceduralGait } from './gait'
+import { castSeconds, useClipCast, useProceduralCast, type CastSignal } from './cast'
 
 const SKIN_FALLBACK_COLOR = '#e0b48a'
 const ROBE_COLOR = '#4a4030'
@@ -76,11 +77,15 @@ function ProceduralCharacterModel({
   shirtColor,
   gender,
   moving,
+  characterClass,
+  cast,
 }: {
   skinColor: string
   shirtColor: string
   gender: CharacterGender
   moving: boolean
+  characterClass: CharacterClass
+  cast: CastSignal | null
 }) {
   const { width, height } = GENDER_PROPORTIONS[gender]
   const baseY = MODEL_FEET_Y * (1 - height)
@@ -89,12 +94,34 @@ function ProceduralCharacterModel({
   const body = useRef<THREE.Group>(null)
   const phase = useRef(0)
   const swing = useRef(0)
+  // ...and for the same reason its cast is the whole body lunging: there are
+  // no arms to swing here, only boxes. It still lasts exactly as long as the
+  // real one for this class, so the aura and the pose stay in step.
+  const castElapsed = useRef<number | null>(null)
+  const castTotal = useRef(0)
+  useEffect(() => {
+    if (!cast) return
+    castElapsed.current = 0
+    castTotal.current = castSeconds(characterClass, cast.kind)
+  }, [cast, characterClass])
+
   useFrame((_, delta) => {
     if (!body.current) return
     swing.current = THREE.MathUtils.damp(swing.current, moving ? 1 : 0, 9, delta)
     phase.current += delta * GAIT_CYCLES_PER_SECOND * Math.PI * 2
     body.current.position.y = baseY + Math.abs(Math.sin(phase.current)) * 0.05 * swing.current
     body.current.rotation.z = Math.sin(phase.current) * 0.06 * swing.current
+
+    let lunge = 0
+    if (castElapsed.current !== null) {
+      castElapsed.current += delta
+      const p = castElapsed.current / castTotal.current
+      if (p >= 1) castElapsed.current = null
+      // Rock back, then throw forward — one sine hump either side of the
+      // midpoint.
+      else lunge = Math.sin(p * Math.PI * 2) * -0.34
+    }
+    body.current.rotation.x = lunge
   })
 
   return (
@@ -238,14 +265,18 @@ function applyShirt(material: THREE.MeshStandardMaterial, asset: ClassAsset, shi
 // stands there.
 function RiggedCharacterModel({
   asset,
+  characterClass,
   skinColor,
   shirtColor,
   moving,
+  cast,
 }: {
   asset: ClassAsset
+  characterClass: CharacterClass
   skinColor: string
   shirtColor: string | null
   moving: boolean
+  cast: CastSignal | null
 }) {
   const { scene, animations } = useGLTF(asset.glb)
 
@@ -283,10 +314,18 @@ function RiggedCharacterModel({
     return clone
   }, [scene, skinColor, shirtColor, asset])
 
-  // Whichever of the two the model is equipped for; each is inert for the
+  // Whichever of each pair the model is equipped for; each is inert for the
   // other's rig.
+  //
+  // Order matters and is not incidental: react-three-fiber runs frame
+  // callbacks in the order they were subscribed, and both cast hooks are
+  // written to land *on top of* whatever the gait put on the bones this frame
+  // (see cast.ts). Moving either cast call above its gait call would have a
+  // walking character's arms overwrite the spell they are casting.
   useClipGait(fitted, animations, moving)
   useProceduralGait(fitted, animations.length === 0, moving)
+  useClipCast(fitted, animations, characterClass, cast)
+  useProceduralCast(fitted, animations.length === 0, characterClass, cast)
 
   return <primitive object={fitted} />
 }
@@ -309,11 +348,16 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
 export function CharacterModel({
   appearance,
   moving = false,
+  cast = null,
 }: {
   appearance: CharacterAppearance
-  // Drives the walk cycle. Left off for the profile and battle portraits, so
-  // they stand and breathe rather than march on the spot.
+  // Drives the walk cycle. Left off for the profile portrait, so it stands and
+  // breathes rather than marching on the spot.
   moving?: boolean
+  // The most recent cast (see character/cast.ts). A new signal id replays the
+  // class's cast motion; null — which is what every portrait passes — means
+  // this copy of the character never casts.
+  cast?: CastSignal | null
 }) {
   const gender = appearance.gender ?? DEFAULT_GENDER
   const skinColor = appearance.skinColor ?? SKIN_FALLBACK_COLOR
@@ -327,6 +371,8 @@ export function CharacterModel({
       shirtColor={shirtColor ?? ROBE_COLOR}
       gender={gender}
       moving={moving}
+      characterClass={appearance.characterClass}
+      cast={cast}
     />
   )
   return (
@@ -334,9 +380,11 @@ export function CharacterModel({
       <Suspense fallback={fallback}>
         <RiggedCharacterModel
           asset={asset}
+          characterClass={appearance.characterClass}
           skinColor={skinColor}
           shirtColor={shirtColor}
           moving={moving}
+          cast={cast}
         />
       </Suspense>
     </ModelErrorBoundary>
