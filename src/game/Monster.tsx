@@ -1,7 +1,10 @@
-import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { Billboard, useAnimations, useGLTF, useTexture } from '@react-three/drei'
-import { LoopRepeat, type Group } from 'three'
+import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Billboard, Html, useAnimations, useGLTF, useTexture } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
+import { DoubleSide, LoopRepeat, type Group, type Mesh } from 'three'
 import { useGameStore } from './store'
+import { playerPosition } from './playerPosition'
+import { distanceToPlayer } from './combat'
 import type { MonsterData } from './monsters'
 
 function MonsterShape({ color, scale }: { color: string; scale: number }) {
@@ -102,9 +105,8 @@ class MonsterArtBoundary extends Component<{ fallback: ReactNode; children: Reac
 }
 
 // The three end-of-level bosses stand taller than the cast they close out.
-// Not exported: the battle screen frames one monster at a time and wants them
-// all the same size (see MonsterPortrait), and a non-component export here
-// would cost this file its fast refresh.
+// Not exported: a non-component export here would cost this file its fast
+// refresh, and nothing outside the dungeon draws a monster any more.
 function monsterScale(name: string): number {
   if (name === 'Elder Dragon') return 1.8
   if (name === 'Hydra') return 1.6
@@ -115,11 +117,6 @@ function monsterScale(name: string): number {
 // One monster's art as three.js objects, with its own fallback chain: the GLB
 // model when it has one, the flat sprite when it doesn't (or when the model
 // fails to load), and a colored blob when neither works.
-//
-// Shared by the dungeon (Monster, below) and by the battle screen
-// (MonsterPortrait) — which is the whole reason it is a component of its own.
-// A monster that a player met in the corridor should be the same creature,
-// animation and all, when the fight screen opens on it.
 //
 // Every boundary/Suspense pair has to live on this side of the <Canvas>: an
 // asset failure throws inside the canvas's own React root, so a boundary
@@ -147,13 +144,167 @@ export function MonsterArt({ data, scale = 1 }: { data: MonsterData; scale?: num
   )
 }
 
+// How close the player has to be for a monster's nameplate to appear. Set
+// against the lantern (LANTERN_RADIUS = 11): a monster whose name is floating
+// in the dark is one the player cannot see yet, so this stays just inside the
+// edge of the light.
+const NAMEPLATE_RANGE = 9
+
+// How long a monster reels after being hit, in seconds.
+const HURT_TIME = 0.22
+
+// A monster standing in the dungeon: its art, its click target, its
+// nameplate, and the ring that marks it as the locked target.
+//
+// This is the whole fight now. There is no battle screen to open — the player
+// clicks the thing they want to hit, the code boxes appear beside it (see
+// TargetPanel), and everything happens right here in the corridor.
 export function Monster({ data }: { data: MonsterData }) {
   const defeated = useGameStore((s) => s.defeatedIds.has(data.id))
+  const targeted = useGameStore((s) => s.targetId === data.id)
+  const hp = useGameStore((s) => s.monsterHp[data.id])
+  const swing = useGameStore((s) => s.monsterSwing[data.id])
+  const setTarget = useGameStore((s) => s.setTarget)
+
+  const scale = monsterScale(data.name)
+  const art = useRef<Group>(null)
+  const ring = useRef<Mesh>(null)
+  // Seconds left of the current hurt reaction. A ref, not state: it changes
+  // every frame and only the transform cares.
+  const hurt = useRef(0)
+  const lastHp = useRef(hp)
+
+  const [near, setNear] = useState(false)
+  const [hovered, setHovered] = useState(false)
+
+  // Hovering a monster is the game's own "this is clickable" affordance —
+  // there is no cursor inside a WebGL canvas unless someone sets one.
+  useEffect(() => {
+    if (!hovered) return
+    document.body.style.cursor = 'crosshair'
+    return () => {
+      document.body.style.cursor = 'auto'
+    }
+  }, [hovered])
+
+  // Kick off the recoil whenever this monster's HP actually drops. Reading it
+  // from the store rather than from the spell that dealt the damage means a
+  // hit lands visibly no matter which of the two code boxes threw it.
+  useEffect(() => {
+    if (lastHp.current != null && hp != null && hp < lastHp.current) hurt.current = HURT_TIME
+    lastHp.current = hp
+  }, [hp])
+
+  useFrame((_, delta) => {
+    // Nameplates are drawn for the handful of monsters the player can
+    // actually see. Flipping React state on a boolean (rather than storing
+    // the distance) keeps this to one re-render per monster per approach.
+    const inSight = distanceToPlayer(data, playerPosition.x, playerPosition.z) <= NAMEPLATE_RANGE
+    if (inSight !== near) setNear(inSight)
+
+    if (ring.current) ring.current.rotation.z += delta * 0.9
+
+    if (art.current) {
+      if (hurt.current > 0) {
+        hurt.current = Math.max(0, hurt.current - delta)
+        // A quick shove away from the player, decaying back to rest — the
+        // in-world equivalent of the old battle screen's recoil animation.
+        const push = (hurt.current / HURT_TIME) * 0.22
+        art.current.position.x = push
+        art.current.position.y = push * 0.5
+      } else if (art.current.position.x !== 0) {
+        art.current.position.set(0, 0, 0)
+      }
+    }
+  })
+
   if (defeated) return null
+
+  const maxHp = data.maxHp
+  const currentHp = hp ?? maxHp
+  const hpPct = Math.max(0, Math.min(100, (currentHp / maxHp) * 100))
+  const wounded = currentHp < maxHp
+  const engaged = swing != null
+  const showPlate = near || targeted
 
   return (
     <group position={data.position}>
-      <MonsterArt data={data} scale={monsterScale(data.name)} />
+      <group ref={art}>
+        <MonsterArt data={data} scale={scale} />
+      </group>
+
+      {/* The click target. A box rather than the model itself: a GLB's own
+          meshes are whatever shape the artist made, and a slime's are small
+          enough to be genuinely hard to hit. Transparent instead of
+          `visible={false}` because three skips invisible objects when
+          raycasting — an invisible box would not be clickable at all. */}
+      <mesh
+        position={[0, 0.1 * scale, 0]}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          setTarget(data.id)
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation()
+          setHovered(true)
+        }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <boxGeometry args={[1.3 * scale, 1.7 * scale, 1.3 * scale]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Target ring on the floor, the way an RO client marks what you have
+          selected. Hovering shows a dimmer version of the same ring, so it is
+          obvious what a click would grab before it is grabbed. */}
+      {(targeted || hovered) && (
+        <mesh ref={ring} position={[0, -0.68 * scale, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.52 * scale, 0.72 * scale, 40, 1, 0, Math.PI * 1.6]} />
+          <meshBasicMaterial
+            color={targeted ? '#f0c85a' : '#cbb98f'}
+            transparent
+            opacity={targeted ? 0.95 : 0.4}
+            side={DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {showPlate && (
+        <Html
+          position={[0, 0.95 * scale, 0]}
+          center
+          zIndexRange={[8, 4]}
+          // The nameplate is a label, not a panel: it must never intercept the
+          // click meant for the monster underneath it. drei's own
+          // `pointerEvents` prop is a no-op outside transform mode, so the
+          // wrapper class carries it — pointer-events is inherited, so one
+          // rule on the wrapper covers everything drawn inside it.
+          wrapperClass="nameplate-wrapper"
+        >
+          <div className={`nameplate${targeted ? ' nameplate-target' : ''}${engaged ? ' nameplate-engaged' : ''}`}>
+            <span className="nameplate-name">{data.name}</span>
+            {(targeted || engaged || wounded) && (
+              <>
+                <span className="nameplate-hp-track">
+                  <span className="nameplate-hp-fill" style={{ width: `${hpPct}%` }} />
+                </span>
+                <span className="nameplate-hp-text">
+                  {currentHp} / {maxHp}
+                </span>
+              </>
+            )}
+            {engaged && (
+              <span className="nameplate-swing-track">
+                <span
+                  className="nameplate-swing-fill"
+                  style={{ width: `${Math.max(0, Math.min(100, (1 - swing / data.attackInterval) * 100))}%` }}
+                />
+              </span>
+            )}
+          </div>
+        </Html>
+      )}
     </group>
   )
 }

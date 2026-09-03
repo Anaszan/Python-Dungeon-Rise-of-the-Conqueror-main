@@ -76,349 +76,388 @@ canvas {
   height: 100%;
 }
 
-.combat-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
-  box-sizing: border-box;
-  background: var(--wood-dark);
-}
+/* ── Fighting in the dungeon ────────────────────────────────────────────
+   There is no battle screen any more. A fight is a monster you clicked, a
+   nameplate over its head, a panel of code boxes floating beside it, and
+   numbers popping off whatever just got hit — all of it drawn over the live
+   3D scene by drei's <Html>, which parks a DOM element at a point in the
+   world and keeps it there as the camera moves.
 
-/* Battle screen, laid out the way a Pokemon fight is: a shallow arena strip
-   on top with both combatants facing off, and the command box filling the
-   rest below it. The arena is a fixed slice of the viewport so the console
-   underneath always keeps a usable amount of room. */
-.battle-screen {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  color: var(--parchment-text);
-}
+   Everything below is that overlay. drei owns the wrapper element's position
+   and transform (it rewrites them every frame), so each rule here styles the
+   element *inside* the wrapper and only ever nudges it with a transform of
+   its own. */
 
-.battle-stage {
-  position: relative;
-  flex-shrink: 0;
-  height: clamp(220px, 38vh, 360px);
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse 130% 60% at 50% 108%, rgba(122, 86, 42, 0.85), transparent 72%),
-    radial-gradient(circle at 50% 12%, #4a3418 0%, transparent 62%),
-    linear-gradient(180deg, #150e07 0%, #2b1d12 58%, #3d2a17 100%);
-}
+/* Nameplate: name, HP, and the little bar counting down to the monster's next
+   swing. Drawn for every monster within NAMEPLATE_RANGE, so it has to stay
+   small and quiet — it is a label on a creature, not a panel.
 
-/* Everything on the stage is absolutely placed rather than gridded: a 2x2
-   grid would cap each fighter at half the stage height, and the point of
-   this framing is that the fighters are the big elements. They get most of
-   the height each and overlap through the middle.
-
-   Each status card sits on its own fighter's side of the screen — player
-   left, monster right — but in the opposite corner vertically, so a card
-   never covers the fighter it belongs to. */
-.battle-info {
-  position: absolute;
-  z-index: 2;
-  width: min(44%, 250px);
-  box-sizing: border-box;
-  padding: 8px 12px;
-  border: 2px solid var(--gold-dim);
-  border-radius: 10px;
-  background: linear-gradient(160deg, rgba(61, 42, 23, 0.95), rgba(26, 18, 11, 0.95));
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
-  text-align: left;
-}
-
-/* Monster's card is on the monster's side (right), below its sprite. */
-.battle-info-enemy {
-  bottom: clamp(8px, 2vw, 18px);
-  right: clamp(8px, 2vw, 18px);
-}
-
-/* Player's card is on the player's side (left), above their character. */
-.battle-info-player {
-  top: clamp(8px, 2vw, 18px);
-  left: clamp(8px, 2vw, 18px);
-}
-
-.battle-info-name {
-  margin: 0 0 6px;
-  font-family: 'Cinzel', 'Noto Sans Thai', serif;
-  font-size: clamp(13px, 1.6vw, 16px);
-  color: var(--gold-bright);
-}
-
-.battle-info-hp {
-  margin: 5px 0 0;
-  font-size: 12px;
-  color: var(--parchment-dim);
-}
-
-.battle-sprite {
-  position: absolute;
-  z-index: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 12px;
-  box-sizing: border-box;
-}
-
-/* The enemy sits back and upstage, the player nearer and lower — the depth
-   cue that makes it read as one room seen over the player's shoulder. */
-.battle-sprite-enemy {
-  top: 4%;
-  right: 3%;
-  width: min(44%, 300px);
-  height: 56%;
-}
-
-/* Nudged in from the edge so the character clears the enemy's status card
-   above it rather than sitting directly under it. */
-.battle-sprite-player {
-  bottom: 0;
-  left: 8%;
-  width: min(50%, 360px);
-  height: 70%;
-}
-
-.battle-sprite img {
-  position: relative;
-  z-index: 1;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
-}
-
-.battle-sprite-fallback {
-  position: relative;
-  z-index: 1;
-  width: 60%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-}
-
-/* Both sides are live 3D canvases rather than sprites (CharacterPortrait and
-   MonsterPortrait), so they fill their cell instead of sitting on the baseline
-   like an image does. */
-.battle-sprite canvas {
-  position: relative;
-  z-index: 1;
-}
-
-.battle-sprite-enemy canvas {
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
-}
-
-/* Pool of light each combatant stands in — sells the two of them as being
-   in the same room rather than floating in a status panel. */
-.battle-platform {
-  position: absolute;
-  left: 50%;
-  bottom: 4px;
-  transform: translateX(-50%);
-  width: clamp(80px, 62%, 200px);
-  height: 26px;
-  border-radius: 50%;
-  background: radial-gradient(
-    ellipse at 50% 50%,
-    rgba(212, 175, 55, 0.32),
-    rgba(212, 175, 55, 0.08) 58%,
-    transparent 74%
-  );
+   The same wrapper carries the damage numbers. Both are labels stuck to a
+   creature, and neither may ever swallow the click meant for the creature
+   itself: pointer-events is inherited, so this one rule covers everything
+   drei renders inside the wrapper. */
+.nameplate-wrapper {
   pointer-events: none;
 }
 
-.battle-sprite-player .battle-platform {
-  width: clamp(110px, 74%, 240px);
-  height: 32px;
-}
-
-.battle-command-box {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: clamp(12px, 2.5vw, 22px) clamp(14px, 6vw, 140px);
-  border-top: 3px solid var(--gold-dim);
-  background: linear-gradient(160deg, var(--wood-light), var(--wood));
-  box-shadow: inset 0 6px 18px rgba(0, 0, 0, 0.35);
-  text-align: center;
-}
-
-.battle-result {
+.nameplate {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 100%;
+  gap: 3px;
+  width: 132px;
+  padding: 4px 8px 5px;
+  box-sizing: border-box;
+  border-radius: 7px;
+  border: 1px solid rgba(138, 106, 47, 0.65);
+  background: rgba(12, 8, 5, 0.62);
+  text-align: center;
+  user-select: none;
+  transform: translateY(-4px);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
-/* Phones: the arena gives up height and the status cards tighten up, so the
-   code console below keeps enough room to actually type in. */
-@media (max-width: 560px) {
-  .battle-stage {
-    height: clamp(190px, 32vh, 260px);
-  }
-
-  .battle-info {
-    width: min(52%, 190px);
-    padding: 6px 8px;
-  }
-
-  .battle-sprite-enemy {
-    width: 46%;
-  }
-
-  .battle-sprite-player {
-    left: 4%;
-    width: 54%;
-    height: 66%;
-  }
-
-  .battle-info-name {
-    margin-bottom: 4px;
-  }
-
-  .battle-info-hp,
-  .battle-attack-timer-label {
-    font-size: 10px;
-  }
-
-  .battle-info .hp-bar-track {
-    height: 10px;
-  }
+/* The locked target reads gold, the way its floor ring does. */
+.nameplate-target {
+  border-color: var(--gold);
+  background: rgba(26, 18, 11, 0.85);
+  box-shadow: 0 0 14px -3px rgba(240, 200, 90, 0.55);
 }
 
-/* Hit reactions run on the art itself, not the cell, so the pool of light
-   each combatant stands in stays put while they move. Both sides now sit on
-   a diagonal — player bottom-left, enemy top-right — so a lunge travels
-   toward the opponent and a recoil is knocked back away from them. */
-
-/* Player just hit the monster: it recoils up-right and whitens for an instant. */
-.battle-sprite-enemy.recoil canvas,
-.battle-sprite-enemy.recoil img,
-.battle-sprite-enemy.recoil .battle-sprite-fallback {
-  animation: enemy-recoil 0.3s ease;
+/* Something within swinging distance of the player goes red, whether or not
+   it is the thing being targeted — that warning is about the player's HP, not
+   about what they picked. */
+.nameplate-engaged {
+  border-color: var(--hp-red-bright);
 }
 
-@keyframes enemy-recoil {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-    filter: brightness(1);
-  }
-  30% {
-    transform: translate(12px, -8px) rotate(4deg);
-    filter: brightness(2.6) saturate(0.4);
-  }
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-    filter: brightness(1);
-  }
+.nameplate-name {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--parchment-text);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
-/* The monster just landed its own attack: it dives down-left at the player. */
-.battle-sprite-enemy.lunge canvas,
-.battle-sprite-enemy.lunge img,
-.battle-sprite-enemy.lunge .battle-sprite-fallback {
-  animation: enemy-lunge 0.3s ease;
+.nameplate-engaged .nameplate-name {
+  color: #ffcfc6;
 }
 
-@keyframes enemy-lunge {
-  0% {
-    transform: scale(1) translate(0, 0);
-    filter: brightness(1);
-  }
-  40% {
-    transform: scale(1.12) translate(-14px, 10px);
-    filter: brightness(1.3);
-  }
-  100% {
-    transform: scale(1) translate(0, 0);
-    filter: brightness(1);
-  }
+.nameplate-hp-track {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(138, 106, 47, 0.7);
+  overflow: hidden;
 }
 
-/* Mirror image for the player's side: knocked back down-left when hit,
-   driving up-right into the monster when landing one. */
-.battle-sprite-player.recoil canvas,
-.battle-sprite-player.recoil img {
-  animation: player-recoil 0.3s ease;
+.nameplate-hp-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(180deg, var(--hp-red-bright), var(--hp-red));
+  transition: width 0.18s ease;
 }
 
-@keyframes player-recoil {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-    filter: brightness(1);
-  }
-  30% {
-    transform: translate(-12px, 8px) rotate(-4deg);
-    filter: brightness(2.6) saturate(0.4);
-  }
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-    filter: brightness(1);
-  }
+.nameplate-hp-text {
+  font-size: 9px;
+  color: var(--parchment-dim);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
-.battle-sprite-player.lunge canvas,
-.battle-sprite-player.lunge img {
-  animation: player-lunge 0.3s ease;
+/* Fills up as the monster winds up. Full bar = it hits this instant, which is
+   the cue to either finish it or walk out of range. */
+.nameplate-swing-track {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.6);
+  overflow: hidden;
 }
 
-@keyframes player-lunge {
-  0% {
-    transform: scale(1) translate(0, 0);
-  }
-  40% {
-    transform: scale(1.08) translate(14px, -10px);
-  }
-  100% {
-    transform: scale(1) translate(0, 0);
-  }
+.nameplate-swing-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dim), var(--hp-red-bright));
+  transition: width 0.1s linear;
 }
 
-/* Defeat: the monster drops out of frame instead of just freezing at 0 HP. */
-.battle-sprite-enemy.fainted canvas,
-.battle-sprite-enemy.fainted img,
-.battle-sprite-enemy.fainted .battle-sprite-fallback {
-  animation: enemy-faint 0.6s ease forwards;
+/* The code boxes, anchored beside the targeted monster. Offset to the right
+   of the anchor point and centred on it vertically, so the monster itself is
+   never underneath the panel. */
+.target-panel {
+  width: min(340px, 40vw);
+  max-height: 66vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 10px 12px 12px;
+  border: 2px solid var(--gold-dim);
+  border-radius: 12px;
+  background: linear-gradient(160deg, rgba(61, 42, 23, 0.97), rgba(18, 12, 7, 0.97));
+  box-shadow:
+    0 10px 34px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  color: var(--parchment-text);
+  /* Clear of the monster's own nameplate (132px wide, centred on the same
+     anchor), so the panel never covers the name of the thing it belongs to. */
+  transform: translate(74px, -50%);
+  animation: target-panel-in 0.16s ease-out;
 }
 
-@keyframes enemy-faint {
-  0% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(48px) scale(0.85);
+/* A target standing in the right half of the screen gets its panel on the
+   left instead — otherwise a fight near the right edge would push the code
+   boxes off it. TargetPanel decides which side per frame; this is the other
+   side's geometry. */
+.target-panel-flipped {
+  transform: translate(calc(-100% - 74px), -50%);
+  animation-name: target-panel-in-flipped;
+}
+
+@keyframes target-panel-in {
+  from {
     opacity: 0;
+    transform: translate(60px, -50%) scale(0.97);
   }
 }
 
-.battle-screen.panel-shake {
-  animation: panel-shake 0.3s ease;
+@keyframes target-panel-in-flipped {
+  from {
+    opacity: 0;
+    transform: translate(calc(-100% - 60px), -50%) scale(0.97);
+  }
 }
 
-@keyframes panel-shake {
-  0%,
+/* Folded away: header, HP and the swing warning only. Enough to keep an eye
+   on a fight without a code editor covering the room. */
+.target-panel-collapsed {
+  width: min(260px, 34vw);
+  padding-bottom: 10px;
+}
+
+.target-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.target-panel-title {
+  min-width: 0;
+}
+
+.target-panel-name {
+  display: block;
+  font-family: 'Cinzel', 'Noto Sans Thai', serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+
+.target-panel-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.target-badge {
+  padding: 1px 7px;
+  border-radius: 9px;
+  border: 1px solid rgba(138, 106, 47, 0.6);
+  background: rgba(0, 0, 0, 0.32);
+  font-size: 9.5px;
+  color: var(--parchment-dim);
+  white-space: nowrap;
+}
+
+.target-panel-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.target-panel-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--parchment-dim);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.target-panel-btn:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+}
+
+.target-panel-vitals {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.target-panel-hp {
+  flex: 1;
+  height: 11px;
+  border-radius: 6px;
+}
+
+.target-panel-hp-text {
+  font-size: 10.5px;
+  color: var(--parchment-dim);
+  white-space: nowrap;
+}
+
+.target-panel-swing {
+  margin: 8px 0 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(232, 72, 63, 0.5);
+  background: rgba(184, 38, 44, 0.16);
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #ffcfc6;
+}
+
+.target-panel-warning {
+  margin: 8px 0 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(240, 200, 90, 0.45);
+  background: rgba(240, 200, 90, 0.12);
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--gold-bright);
+}
+
+.target-panel-hint {
+  margin: 10px 0 0;
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: var(--parchment-dim);
+  opacity: 0.85;
+}
+
+/* Damage numbers. Purely decorative, so they never take a pointer event and
+   never wait on anything — they animate for FLOATING_HIT_MS (combatFx.ts) and
+   the component drops them. Keep the two durations in step. */
+.floating-hit {
+  display: block;
+  font-family: 'Cinzel', 'Noto Sans Thai', serif;
+  font-size: 19px;
+  font-weight: 700;
+  white-space: nowrap;
+  user-select: none;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.9),
+    0 0 10px rgba(0, 0, 0, 0.7);
+  animation: floating-hit 1s ease-out forwards;
+}
+
+.floating-hit-attack {
+  color: #ffe9a8;
+}
+
+.floating-hit-skill {
+  color: var(--arcane-bright);
+  font-size: 23px;
+}
+
+.floating-hit-player {
+  color: var(--hp-red-bright);
+}
+
+.floating-hit-note {
+  color: var(--parchment-dim);
+  font-size: 14px;
+}
+
+@keyframes floating-hit {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.7);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1.12);
+  }
+  32% {
+    transform: translateY(-12px) scale(1);
+  }
   100% {
-    transform: translateX(0);
+    opacity: 0;
+    transform: translateY(-46px) scale(0.95);
   }
-  20% {
-    transform: translateX(-8px);
+}
+
+/* The HUD and the level banner sit above the nameplates (which are labels
+   scattered over the floor) and below the target panel (which is the thing
+   the player is actually using). */
+.player-hud,
+.level-banner {
+  z-index: 20;
+}
+
+/* Phones: a 340px panel bolted to a monster is half off screen, and the
+   monster it is bolted to is often under the player's own thumb. So the panel
+   stops being anchored at all and docks to the bottom edge — the nameplate
+   and the target ring are still in the scene to say *which* monster it
+   belongs to. The wrapper's position and transform are written inline by drei
+   every frame, which is what these !important flags are overriding. */
+@media (max-width: 640px) {
+  .target-panel-wrapper {
+    position: fixed !important;
+    left: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    transform: none !important;
   }
-  40% {
-    transform: translateX(7px);
+
+  /* drei's own element between the wrapper and the panel is absolutely
+     positioned, which inside a bottom-docked wrapper would hang the panel off
+     the bottom of the screen. */
+  .target-panel-inner {
+    position: static !important;
   }
-  60% {
-    transform: translateX(-5px);
+
+  .target-panel,
+  .target-panel-flipped {
+    width: 100%;
+    max-height: 54vh;
+    border-width: 2px 0 0;
+    border-radius: 14px 14px 0 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    transform: none;
+    animation: none;
   }
-  80% {
-    transform: translateX(3px);
+
+  .target-panel-collapsed {
+    width: 100%;
+  }
+
+  /* Docked, the panel is the bottom half of the screen — so the two controls
+     that live down there move above it. Only while a panel is actually open:
+     with nothing targeted they belong back in the corner. */
+  body:has(.target-panel) .touch-joystick-base,
+  body:has(.target-panel) .pause-btn {
+    bottom: calc(16px + 56vh);
+  }
+
+  /* Folded away, the panel is a header strip and the controls only need to
+     clear that much. */
+  body:has(.target-panel-collapsed) .touch-joystick-base,
+  body:has(.target-panel-collapsed) .pause-btn {
+    bottom: calc(16px + 130px);
   }
 }
 
@@ -437,9 +476,11 @@ canvas {
   transition: width 0.2s ease;
 }
 
-/* On the battle stage the bar's color carries the state before you read the
-   numbers, the way a Pokemon HP bar does. Bars elsewhere (practice dummy,
-   landing page) keep the plain red fill above. */
+/* Optional tone variants for an HP bar whose colour should carry the state
+   before the numbers are read. Nothing in the dungeon uses them today — the
+   nameplates and the target panel are deliberately monster-red at every
+   health — but the exam guardian and the practice dummy are the natural
+   places for them. */
 .hp-bar-fill.hp-ok {
   background: linear-gradient(180deg, #86e26f, #3fa32c);
 }
@@ -450,74 +491,6 @@ canvas {
 
 .hp-bar-fill.hp-danger {
   background: linear-gradient(180deg, var(--hp-red-bright), var(--hp-red));
-}
-
-.battle-attack-timer {
-  margin: 8px 0 0;
-}
-
-.battle-attack-timer-label {
-  font-size: 11px;
-  color: var(--parchment-dim);
-  margin: 0 0 3px;
-}
-
-.battle-attack-timer-track {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--wood-dark);
-  border: 1px solid var(--gold-dim);
-  overflow: hidden;
-}
-
-.battle-attack-timer-fill {
-  height: 100%;
-  background: linear-gradient(180deg, var(--gold-bright), var(--gold-dim));
-  transition: width 1s linear;
-}
-
-.combat-message {
-  font-size: 18px;
-  margin-bottom: 16px;
-}
-
-.combat-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.combat-actions button,
-.combat-message + button {
-  padding: 10px 20px;
-  border-radius: 6px;
-  border: 1px solid var(--gold-dim);
-  background: linear-gradient(180deg, var(--gold-bright), var(--gold-dim));
-  color: var(--wood-dark);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.combat-actions button:hover,
-.combat-message + button:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dim));
-}
-
-.combat-actions button:disabled {
-  background: #4a4030;
-  color: #8a8270;
-  border-color: #4a4030;
-  cursor: not-allowed;
-}
-
-.combat-actions-secondary {
-  margin-top: 14px;
-}
-
-.combat-actions-secondary button {
-  padding: 8px 16px;
-  font-size: 13px;
 }
 
 .spell-console {
@@ -533,6 +506,27 @@ canvas {
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.18);
   border: 1px solid var(--gold-dim);
+}
+
+/* The in-dungeon panel (TargetPanel) has a fraction of the room the old
+   battle screen had, so its boxes trade padding for editor. */
+.spell-box-compact {
+  padding: 8px;
+}
+
+.spell-box-compact .spell-textarea {
+  min-height: 96px;
+  font-size: 12px;
+}
+
+.spell-box-compact .spell-run-btn {
+  margin-top: 8px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+}
+
+.spell-box-compact .spell-log {
+  max-height: 88px;
 }
 
 .spell-console-label {
@@ -2284,13 +2278,6 @@ canvas {
 .difficulty-switch-tagline {
   font-size: 11px;
   line-height: 1.5;
-  color: var(--parchment-dim);
-}
-
-.battle-difficulty-badge {
-  margin: 0 0 6px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
   color: var(--parchment-dim);
 }
 

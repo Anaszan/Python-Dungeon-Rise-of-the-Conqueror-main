@@ -44,9 +44,11 @@ export function TouchJoystick() {
   const baseRef = useRef<HTMLDivElement>(null)
   const pointerIdRef = useRef<number | null>(null)
   const [knob, setKnob] = useState({ x: 0, y: 0 })
-  // The stick only exists while walking around by thumb: a fight (or the pause
-  // menu) takes the screen over, the keyboard replaces it outright, and a drag
-  // in progress ends either way.
+  // The stick only exists while walking around by thumb: the pause menu (and
+  // the end-of-level exam, and the game-over screen) takes the screen over,
+  // the keyboard replaces it outright, and a drag in progress ends either way.
+  // Fights no longer hide it — walking away mid-fight is a move now, and on a
+  // phone the stick is the only way to make it.
   const hidden = phase !== 'exploring' || paused || keyboardIsWalking
 
   const reset = useCallback(() => {
@@ -56,9 +58,9 @@ export function TouchJoystick() {
     touchMoveState.z = 0
   }, [])
 
-  // The stick can go away mid-drag: combat starts (stepping onto a monster),
-  // or a hand reaches over to the keyboard while a thumb is still holding the
-  // knob. Either way the base stops rendering ('return null' below) without
+  // The stick can go away mid-drag: the game is paused, or a hand reaches over
+  // to the keyboard while a thumb is still holding the knob. Either way the
+  // base stops rendering ('return null' below) without
   // the pointer ever being lifted over it, so no pointerup/pointercancel
   // arrives to clear the drag — without this reset the last drag vector is
   // still sitting in touchMoveState, and the player walks off on their own the

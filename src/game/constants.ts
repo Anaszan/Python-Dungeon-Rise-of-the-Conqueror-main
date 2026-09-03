@@ -5,8 +5,28 @@ export const PLAYER_SPEED = 4.8
 
 export const ISO_OFFSET = { x: 10, y: 12, z: 10 } as const
 
-export const COMBAT_TRIGGER_DISTANCE = 1.2
-export const FLEE_CLEAR_DISTANCE = 2.2
+// Ranges the whole fight is built out of. Combat happens in the dungeon
+// itself now — there is no battle screen to cut to — so every one of these is
+// a distance on the floor between the player and a monster, measured on the
+// XZ plane (height is never part of it).
+//
+//   AGGRO   a monster starts swinging the moment the player is this close, and
+//           stops the moment they step back out. Every level spawns the player
+//           at least 4 units from its nearest monster (levels.test.ts), so
+//           arriving in a level can never start a fight on its own.
+//   CAST    how far a spell reaches. Comfortably longer than AGGRO, which is
+//           what makes backing out of a monster's swing and finishing it from
+//           range a real option rather than a bug.
+//   LOCK    how far away a monster can be clicked to become the target. Longer
+//           than CAST on purpose: picking your next target across the room and
+//           walking into range is how RO plays.
+//   DROP    walk this far from the locked target and the lock lets go by
+//           itself, so a target left behind two rooms ago stops following the
+//           player around.
+export const MONSTER_AGGRO_RANGE = 2.2
+export const SPELL_CAST_RANGE = 6.5
+export const TARGET_LOCK_RANGE = 10
+export const TARGET_DROP_RANGE = 13
 export const PICKUP_TRIGGER_DISTANCE = 1.0
 
 export const PLAYER_MAX_HP = 200

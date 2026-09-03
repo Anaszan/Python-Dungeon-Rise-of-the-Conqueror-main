@@ -1,5 +1,4 @@
-import { useRef } from 'react'
-import * as THREE from 'three'
+import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Sparkles } from '@react-three/drei'
 import { Ground } from './Ground'
@@ -8,6 +7,11 @@ import { IsoCamera } from './IsoCamera'
 import { Monster } from './Monster'
 import { Pickup } from './Pickup'
 import { CombatTicker } from './CombatTicker'
+import { TargetPanel } from './TargetPanel'
+import { FloatingHits } from './FloatingHits'
+import { playerPosition } from './playerPosition'
+import { cycleTarget } from './combat'
+import { isTypingTarget } from './useKeyboardMap'
 import {
   BonePile,
   Bookshelf,
@@ -30,7 +34,7 @@ import type { PropProps } from './DungeonProps'
 import type { DecorationKind } from './levels'
 import { LEVELS } from './levels'
 import { useGameStore } from './store'
-import { COMBAT_TRIGGER_DISTANCE, FLEE_CLEAR_DISTANCE, PICKUP_TRIGGER_DISTANCE } from './constants'
+import { PICKUP_TRIGGER_DISTANCE } from './constants'
 
 // Every prop takes the same props (see PropProps), so a level's decoration
 // list maps straight through this table — adding a prop kind is a new entry
@@ -55,7 +59,9 @@ const DECORATION_COMPONENTS: Record<DecorationKind, (props: PropProps) => React.
 }
 
 export function GameScene() {
-  const playerPos = useRef(new THREE.Vector3(0, 0.6, 0))
+  // The one shared player position (see playerPosition.ts). Player.tsx writes
+  // it, IsoCamera follows it, and every combat check in the level reads it.
+  const playerPos = useRef(playerPosition)
   const phase = useGameStore((s) => s.phase)
   const currentLevel = useGameStore((s) => s.currentLevel)
   const levelData = LEVELS[currentLevel - 1]
@@ -88,28 +94,10 @@ export function GameScene() {
 
     const frameLevelData = LEVELS[state.currentLevel - 1]
 
-    let enteredCombat = false
-    for (const monster of frameLevelData.monsters) {
-      if (state.defeatedIds.has(monster.id)) continue
-      const dx = playerPos.current.x - monster.position[0]
-      const dz = playerPos.current.z - monster.position[2]
-      const distSq = dx * dx + dz * dz
-
-      if (monster.id === state.fledMonsterId) {
-        // Don't re-trigger the monster we just fled until we've stepped away
-        // from it — otherwise Flee immediately re-enters the same fight.
-        if (distSq > FLEE_CLEAR_DISTANCE * FLEE_CLEAR_DISTANCE) state.clearFledMonster()
-        continue
-      }
-
-      if (distSq < COMBAT_TRIGGER_DISTANCE * COMBAT_TRIGGER_DISTANCE) {
-        state.enterCombat(monster)
-        enteredCombat = true
-        break
-      }
-    }
-    if (enteredCombat) return
-
+    // Walking into a monster no longer starts anything — monsters decide for
+    // themselves whether the player is close enough to swing at (see
+    // CombatTicker), and the player decides for themselves what to hit back
+    // (see Monster's click target). All that is left here is pickups.
     for (const pickup of frameLevelData.pickups) {
       if (state.collectedPickupIds.has(pickup.id)) continue
       const dx = playerPos.current.x - pickup.position[0]
@@ -121,6 +109,31 @@ export function GameScene() {
       }
     }
   })
+
+  // Tab walks down the monsters in range, nearest first — the one keyboard
+  // habit an RO player brings with them. Bound here rather than in the target
+  // panel because it has to work with nothing targeted yet, which is exactly
+  // when the panel does not exist.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Tab' || isTypingTarget(e.target)) return
+      const state = useGameStore.getState()
+      if (state.phase !== 'exploring' || state.paused) return
+      // Tab is the browser's own focus key, and there is nothing to focus in a
+      // dungeon.
+      e.preventDefault()
+      const next = cycleTarget(
+        LEVELS[state.currentLevel - 1].monsters,
+        state.defeatedIds,
+        playerPosition.x,
+        playerPosition.z,
+        state.targetId,
+      )
+      state.setTarget(next?.id ?? null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   return (
     <>
@@ -167,6 +180,11 @@ export function GameScene() {
       />
       <Player positionRef={playerPos} regions={levelData.regions} walls={levelData.walls} />
       <CombatTicker />
+      {/* Both live inside the canvas because both are anchored to points in
+          the world: the code boxes ride along beside the targeted monster,
+          and every damage number pops off whatever it was dealt to. */}
+      <TargetPanel />
+      <FloatingHits />
       {levelData.monsters.map((monster) => (
         <Monster key={monster.id} data={monster} />
       ))}

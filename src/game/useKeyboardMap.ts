@@ -26,6 +26,19 @@ export function isMovementKey(code: string) {
   return Object.hasOwn(KEY_MAP, code)
 }
 
+// Is this keystroke going into a text field?
+//
+// It matters now in a way it never did before: the code boxes live *in* the
+// dungeon (TargetPanel), so the player types Python while standing in a room
+// full of monsters. Without this, writing `while` would walk them into a wall
+// — w, a and s are all movement keys — and Tab would re-target instead of
+// indenting. Every global key listener in the game goes through this first.
+export function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  return tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || target.isContentEditable
+}
+
 export function useKeyboardMap() {
   const state = useRef<MoveState>({
     forward: false,
@@ -39,7 +52,13 @@ export function useKeyboardMap() {
       const action = KEY_MAP[e.code]
       if (action) state.current[action] = pressed
     }
-    const onDown = (e: KeyboardEvent) => setKey(e, true)
+    const onDown = (e: KeyboardEvent) => {
+      // A keypress meant for a code box never moves the player. Only keydown
+      // is filtered: a key held down *before* focus moved into the textarea
+      // still has to be released, or the player would walk forever.
+      if (isTypingTarget(e.target)) return
+      setKey(e, true)
+    }
     const onUp = (e: KeyboardEvent) => setKey(e, false)
 
     window.addEventListener('keydown', onDown)

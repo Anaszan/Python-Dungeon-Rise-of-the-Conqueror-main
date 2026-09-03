@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { canStandAt, hitsWall, isWalkable, PLAYER_RADIUS, WALL_THICKNESS } from './dungeon'
 import { LEVELS } from './levels'
-import { COMBAT_TRIGGER_DISTANCE, PICKUP_TRIGGER_DISTANCE } from './constants'
+import { MONSTER_AGGRO_RANGE, PICKUP_TRIGGER_DISTANCE } from './constants'
 
 // canStandAt() keeps the player's whole body out of the walls, which also
 // means it narrows every doorway by the player's own half-width on each side.
@@ -97,7 +97,7 @@ describe.each(LEVELS)('level $level ($name)', (level) => {
   const canReach = reachable(level)
 
   it.each(level.monsters)('can reach $name', (monster) => {
-    expect(canReach(monster.position[0], monster.position[2], COMBAT_TRIGGER_DISTANCE)).toBe(true)
+    expect(canReach(monster.position[0], monster.position[2], MONSTER_AGGRO_RANGE)).toBe(true)
   })
 
   it.each(level.pickups)('can reach $id', (pickup) => {

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { GameScene } from './game/GameScene'
-import { CombatOverlay } from './game/CombatOverlay'
 import { LandingPage } from './screens/LandingPage'
 import { StoryIntro } from './screens/StoryIntro'
 import { LoginScreen } from './screens/LoginScreen'
@@ -170,7 +169,6 @@ function App() {
         <PlayerHUD />
         <TouchJoystick />
         <LevelBanner />
-        <CombatOverlay />
         {/* Mounted only while the exam is up, unlike the other overlays,
             which self-guard on phase and stay mounted. This one warms
             Pyodide the moment it mounts — leaving it mounted would kick off
@@ -179,11 +177,12 @@ function App() {
         {phase === 'exam' && <LevelExamOverlay />}
         <GameOverOverlay />
         <VictoryOverlay />
-        {/* Hidden for the duration of a fight and of the end-of-level exam:
-            these sit in the corner the battle screen gives the monster, and
-            each opens a modal that would cover the fight while the monster's
-            attack timer keeps running. */}
-        {phase !== 'combat' && phase !== 'exam' && (
+        {/* Hidden for the duration of the end-of-level exam: each opens a
+            modal, and the exam is the one screen the player is not allowed to
+            walk away from. Fights no longer hide them — combat happens in the
+            dungeon now, and a fight the player can walk out of is not a reason
+            to take the corner buttons away. */}
+        {phase !== 'exam' && (
           <>
             <Leaderboard />
             <PlayerProfile />

@@ -12,7 +12,7 @@ import { canStandAt, hitsWall, isWalkable } from './dungeon'
 import {
   ATTACK_PICKUP_AMOUNT,
   BASE_ATTACK_POWER,
-  COMBAT_TRIGGER_DISTANCE,
+  MONSTER_AGGRO_RANGE,
   LANTERN_RADIUS,
   SKILL_DAMAGE_MULTIPLIER,
 } from './constants'
@@ -257,11 +257,11 @@ describe.each(LEVELS)('level $level ($name)', (level) => {
   })
 
   it('does not drop the player straight into a fight on arrival', () => {
-    // GameScene triggers combat on proximity every frame, including the first
-    // one after a level advance — a monster parked on the spawn point would
-    // start the level mid-battle before the player could move.
+    // Monsters swing at anything inside MONSTER_AGGRO_RANGE, every frame,
+    // including the first one after a level advance — a monster parked on the
+    // spawn point would start eating the player's HP before they could move.
     for (const monster of level.monsters) {
-      expect(distance(spawnPosition, monster.position), monster.name).toBeGreaterThan(COMBAT_TRIGGER_DISTANCE)
+      expect(distance(spawnPosition, monster.position), monster.name).toBeGreaterThan(MONSTER_AGGRO_RANGE)
     }
   })
 
@@ -303,8 +303,8 @@ describe.each(LEVELS)('level $level ($name)', (level) => {
     const lights = (level.decorations ?? []).filter((d) => LIGHT_DECORATION_KINDS.includes(d.kind))
     expect(lights.length).toBeGreaterThan(0)
     // And the lantern has to reach further than the distance at which a
-    // monster starts a fight, or the player would be ambushed out of the dark
+    // monster starts swinging, or the player would be ambushed out of the dark
     // by something they never got to see.
-    expect(LANTERN_RADIUS).toBeGreaterThan(COMBAT_TRIGGER_DISTANCE)
+    expect(LANTERN_RADIUS).toBeGreaterThan(MONSTER_AGGRO_RANGE)
   })
 })

@@ -16,11 +16,11 @@ export type MonsterData = {
   imageUrl?: string
   // The monster's 3D model: a GLB under public/monsters, rendered billboarded
   // and playing whatever attack loop it was exported with. Takes precedence
-  // over imageUrl in *both* places a monster is drawn — the dungeon
-  // (Monster.tsx) and the battle screen (MonsterPortrait.tsx), which share one
-  // MonsterArt component so a creature looks the same in the corridor as it
-  // does in the fight. Normalized against a fixed raw height (see
-  // MODEL_RAW_HEIGHT), so models only need their base at local y=0.
+  // over imageUrl wherever a monster is drawn. Since the fight moved into the
+  // dungeon there is only one such place left — Monster.tsx — and the model a
+  // player walks up to is the model they fight. Normalized against a fixed raw
+  // height (see MODEL_RAW_HEIGHT), so models only need their base at local
+  // y=0.
   modelUrl?: string
   // Exposed to the player's Python code as `monster_armor` (see
   // pyodideRuntime.ts). Defaults to a large number when unset so dividing by

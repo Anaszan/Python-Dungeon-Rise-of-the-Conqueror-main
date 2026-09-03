@@ -25,10 +25,24 @@ vi.mock('./persistence', () => ({
 const { useGameStore } = await import('./store')
 const { saveProgress } = await import('./persistence')
 
-function defeatAllMonstersInLevel(levelIndex: number) {
-  const ids = LEVELS[levelIndex].monsters.map((m) => m.id)
-  useGameStore.setState({ defeatedIds: new Set(ids) })
-  return ids
+// Every monster of a level dead except the last, without going through
+// combat — the setup for testing what the *killing blow* does.
+function killAllButLastInLevel(levelIndex: number) {
+  const monsters = LEVELS[levelIndex].monsters
+  useGameStore.setState({
+    currentLevel: levelIndex + 1,
+    defeatedIds: new Set(monsters.slice(0, -1).map((m) => m.id)),
+    playerHp: 100,
+  })
+}
+
+// And the killing blow itself, which is the only thing that opens an exam.
+function clearLevel(levelIndex: number) {
+  killAllButLastInLevel(levelIndex)
+  const monsters = LEVELS[levelIndex].monsters
+  const last = monsters[monsters.length - 1]
+  useGameStore.getState().setTarget(last.id)
+  useGameStore.getState().damageMonster(last.maxHp)
 }
 
 const loadedSave = {
@@ -91,27 +105,104 @@ describe('useGameStore', () => {
     expect(s.paused).toBe(false)
   })
 
-  it('enterCombat switches to combat and seeds full HP for a new monster', () => {
-    useGameStore.getState().enterCombat({ id: 'slime-1', name: 'Slime', maxHp: 30, attackInterval: 10 })
-    const s = useGameStore.getState()
-    expect(s.phase).toBe('combat')
-    expect(s.activeMonsterId).toBe('slime-1')
-    expect(s.monsterHp['slime-1']).toBe(30)
+  describe('the target lock', () => {
+    const slime = ALL_MONSTERS.find((m) => m.id === 'slime-1')!
+
+    it('seeds full HP the first time a monster is targeted, and never re-seeds it', () => {
+      useGameStore.getState().setTarget('slime-1')
+      expect(useGameStore.getState().targetId).toBe('slime-1')
+      expect(useGameStore.getState().monsterHp['slime-1']).toBe(slime.maxHp)
+
+      // Wound it, look away, look back: the wound is still there. Fights are
+      // interruptible now, so a monster's HP has to survive losing the lock.
+      useGameStore.getState().damageMonster(10)
+      useGameStore.getState().setTarget(null)
+      useGameStore.getState().setTarget('slime-1')
+      expect(useGameStore.getState().monsterHp['slime-1']).toBe(slime.maxHp - 10)
+    })
+
+    it('never locks onto a corpse, or onto something that is not a monster', () => {
+      useGameStore.setState({ defeatedIds: new Set(['slime-1']) })
+      useGameStore.getState().setTarget('slime-1')
+      expect(useGameStore.getState().targetId).toBeNull()
+
+      useGameStore.getState().setTarget('not-a-monster')
+      expect(useGameStore.getState().targetId).toBeNull()
+    })
+
+    // The exam and the game-over screen are both modal. A target lock left
+    // open under one would put a live code console on top of them.
+    it('refuses to lock while anything but the dungeon is on screen', () => {
+      useGameStore.setState({ phase: 'exam' })
+      useGameStore.getState().setTarget('slime-1')
+      expect(useGameStore.getState().targetId).toBeNull()
+    })
+
+    it('lets go of the target the instant it dies', () => {
+      useGameStore.getState().setTarget('slime-1')
+      useGameStore.getState().damageMonster(999)
+
+      const s = useGameStore.getState()
+      expect(s.monsterHp['slime-1']).toBe(0)
+      expect(s.defeatedIds.has('slime-1')).toBe(true)
+      expect(s.targetId, 'a corpse is not a target').toBeNull()
+    })
+
+    it('has nothing to damage with no target locked', () => {
+      useGameStore.getState().damageMonster(999)
+      expect(useGameStore.getState().defeatedIds.size).toBe(0)
+    })
+
+    // Letting go on purpose has to stick, or dismissing the panel while a
+    // monster is chewing on you would be undone by the auto-lock on the next
+    // frame. Everything else that drops a target leaves the auto-lock armed.
+    describe('deliberately letting go', () => {
+      it('tells the auto-lock to leave the player alone', () => {
+        useGameStore.getState().setTarget('slime-1')
+        useGameStore.getState().clearTarget()
+
+        expect(useGameStore.getState().targetId).toBeNull()
+        expect(useGameStore.getState().suppressAutoTarget).toBe(true)
+      })
+
+      it('is undone by picking a target again', () => {
+        useGameStore.getState().clearTarget()
+        useGameStore.getState().setTarget('slime-1')
+
+        expect(useGameStore.getState().suppressAutoTarget).toBe(false)
+      })
+
+      it('is undone by walking clear of everything', () => {
+        useGameStore.getState().clearTarget()
+        useGameStore.getState().allowAutoTarget()
+
+        expect(useGameStore.getState().suppressAutoTarget).toBe(false)
+      })
+
+      it('does not survive dying, a level, or a warp', () => {
+        useGameStore.getState().clearTarget()
+        useGameStore.getState().damagePlayer(PLAYER_MAX_HP)
+        expect(useGameStore.getState().suppressAutoTarget).toBe(false)
+
+        useGameStore.setState({ playerHp: 100, phase: 'exploring' })
+        useGameStore.getState().clearTarget()
+        useGameStore.getState().warpToLevel(3)
+        expect(useGameStore.getState().suppressAutoTarget).toBe(false)
+      })
+    })
   })
 
-  it('damageMonster clamps at 0 and marks the monster defeated', () => {
-    useGameStore.getState().enterCombat({ id: 'slime-1', name: 'Slime', maxHp: 30, attackInterval: 10 })
-    useGameStore.getState().damageMonster(999)
-    const s = useGameStore.getState()
-    expect(s.monsterHp['slime-1']).toBe(0)
-    expect(s.defeatedIds.has('slime-1')).toBe(true)
-  })
+  it('damagePlayer clamps at 0, moves the phase to gameover, and drops the fight', () => {
+    useGameStore.getState().setTarget('slime-1')
+    useGameStore.setState({ monsterSwing: { 'slime-1': 1.2 } })
 
-  it('damagePlayer clamps at 0 and moves the phase to gameover', () => {
     useGameStore.getState().damagePlayer(PLAYER_MAX_HP + 50)
+
     const s = useGameStore.getState()
     expect(s.playerHp).toBe(0)
     expect(s.phase).toBe('gameover')
+    expect(s.targetId).toBeNull()
+    expect(s.monsterSwing).toEqual({})
   })
 
   it('healPlayer clamps at PLAYER_MAX_HP', () => {
@@ -120,22 +211,21 @@ describe('useGameStore', () => {
     expect(useGameStore.getState().playerHp).toBe(PLAYER_MAX_HP)
   })
 
-  it('exitCombat opens the end-of-level exam once every monster in the current level is defeated', () => {
-    const ids = defeatAllMonstersInLevel(0)
-    useGameStore.setState({ currentLevel: 1, activeMonsterId: ids[ids.length - 1], playerHp: 100 })
+  it('the killing blow on a level’s last monster opens that level’s exam', () => {
+    killAllButLastInLevel(0)
+    const last = LEVELS[0].monsters[LEVELS[0].monsters.length - 1]
+    useGameStore.getState().setTarget(last.id)
 
-    useGameStore.getState().exitCombat()
+    useGameStore.getState().damageMonster(last.maxHp)
 
     const s = useGameStore.getState()
     expect(s.phase).toBe('exam')
     expect(s.currentLevel).toBe(1) // still level 1 — the exam has not been passed yet
-    expect(s.activeMonsterId).toBeNull()
+    expect(s.targetId).toBeNull()
   })
 
   it('passLevelExam is what actually advances the level', () => {
-    const ids = defeatAllMonstersInLevel(0)
-    useGameStore.setState({ currentLevel: 1, activeMonsterId: ids[ids.length - 1], playerHp: 100 })
-    useGameStore.getState().exitCombat()
+    clearLevel(0)
 
     useGameStore.getState().passLevelExam()
 
@@ -154,11 +244,7 @@ describe('useGameStore', () => {
   })
 
   it('the final level reaches victory through its exam, not around it', () => {
-    const lastLevelIndex = LEVELS.length - 1
-    const ids = defeatAllMonstersInLevel(lastLevelIndex)
-    useGameStore.setState({ currentLevel: LEVELS.length, activeMonsterId: ids[ids.length - 1], playerHp: 100 })
-
-    useGameStore.getState().exitCombat()
+    clearLevel(LEVELS.length - 1)
     expect(useGameStore.getState().phase).toBe('exam')
 
     useGameStore.getState().passLevelExam()
@@ -208,25 +294,19 @@ describe('useGameStore', () => {
     })
   })
 
-  it('exitCombat treats an undefeated monster as a flee, not a level clear', () => {
-    useGameStore.getState().enterCombat({ id: 'slime-1', name: 'Slime', maxHp: 30, attackInterval: 10 })
-    useGameStore.setState({ playerHp: 100 })
+  // Walking away from a monster you were beating on is a normal move now, not
+  // a "Flee" button that ends something. Nothing about the level changes.
+  it('dropping the target mid-fight leaves the level exactly as it was', () => {
+    useGameStore.getState().setTarget('slime-1')
+    useGameStore.getState().damageMonster(5)
 
-    useGameStore.getState().exitCombat()
+    useGameStore.getState().setTarget(null)
 
     const s = useGameStore.getState()
     expect(s.phase).toBe('exploring')
     expect(s.currentLevel).toBe(1)
-    expect(s.fledMonsterId).toBe('slime-1')
-  })
-
-  it('exitCombat is a no-op while the player is already dead', () => {
-    useGameStore.setState({ playerHp: 0, activeMonsterId: 'slime-1', phase: 'gameover' })
-
-    useGameStore.getState().exitCombat()
-
-    expect(useGameStore.getState().activeMonsterId).toBe('slime-1')
-    expect(useGameStore.getState().phase).toBe('gameover')
+    expect(s.targetId).toBeNull()
+    expect(s.defeatedIds.size).toBe(0)
   })
 
   it('confirmCharacter stores the chosen class, gender, skin, shirt, and name', () => {
@@ -342,11 +422,12 @@ describe('useGameStore', () => {
     expect(useGameStore.getState().phase).toBe('exploring')
   })
 
-  it('setPaused toggles the paused flag without touching phase', () => {
-    useGameStore.getState().enterCombat({ id: 'slime-1', name: 'Slime', maxHp: 30, attackInterval: 10 })
+  it('setPaused toggles the paused flag without touching phase or the target', () => {
+    useGameStore.getState().setTarget('slime-1')
     useGameStore.getState().setPaused(true)
     expect(useGameStore.getState().paused).toBe(true)
-    expect(useGameStore.getState().phase).toBe('combat')
+    expect(useGameStore.getState().phase).toBe('exploring')
+    expect(useGameStore.getState().targetId).toBe('slime-1')
     useGameStore.getState().setPaused(false)
     expect(useGameStore.getState().paused).toBe(false)
   })
@@ -381,23 +462,16 @@ describe('useGameStore', () => {
 })
 
 // Driving the real store through the whole campaign the way a player would:
-// walk into every monster of a level, kill it, leave the fight, sit the
-// end-of-level exam, and expect the game to hand out the next level — and the
-// victory screen after the last one. The individual exitCombat cases above
-// each pin one branch; this is the check that all six levels really do chain
-// together end to end.
+// click every monster of a level, kill it, sit the end-of-level exam, and
+// expect the game to hand out the next level — and the victory screen after
+// the last one. The individual cases above each pin one branch; this is the
+// check that all six levels really do chain together end to end.
 function fightAndDefeat(monster: (typeof ALL_MONSTERS)[number]) {
-  const store = useGameStore.getState()
-  store.enterCombat({
-    id: monster.id,
-    name: monster.name,
-    maxHp: monster.maxHp,
-    attackInterval: monster.attackInterval,
-  })
-  expect(useGameStore.getState().phase, `entering ${monster.name}`).toBe('combat')
+  useGameStore.getState().setTarget(monster.id)
+  expect(useGameStore.getState().targetId, `targeting ${monster.name}`).toBe(monster.id)
   useGameStore.getState().damageMonster(monster.maxHp)
   expect(useGameStore.getState().monsterHp[monster.id], `${monster.name} HP`).toBe(0)
-  useGameStore.getState().exitCombat()
+  expect(useGameStore.getState().targetId, `${monster.name} is still targeted after dying`).toBeNull()
 }
 
 // Stands in for the player actually writing and passing the level's exam in
@@ -447,21 +521,18 @@ describe('level completion', () => {
     else expect(s.currentLevel).toBe(level.level + 1)
   })
 
-  it('treats fleeing the final monster as leaving the level unfinished', () => {
+  it('treats walking away from the final monster as leaving the level unfinished', () => {
     const level = LEVELS[0]
     level.monsters.slice(0, -1).forEach(fightAndDefeat)
 
     const last = level.monsters[level.monsters.length - 1]
-    useGameStore.getState().enterCombat({
-      id: last.id,
-      name: last.name,
-      maxHp: last.maxHp,
-      attackInterval: last.attackInterval,
-    })
-    useGameStore.getState().exitCombat() // fled, never killed it
+    useGameStore.getState().setTarget(last.id)
+    useGameStore.getState().damageMonster(last.maxHp - 1) // hurt, never killed
+    useGameStore.getState().setTarget(null)
 
     const s = useGameStore.getState()
     expect(s.currentLevel).toBe(1)
-    expect(s.fledMonsterId).toBe(last.id)
+    expect(s.phase).toBe('exploring')
+    expect(s.monsterHp[last.id]).toBe(1)
   })
 })

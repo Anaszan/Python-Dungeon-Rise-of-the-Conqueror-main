@@ -22,6 +22,14 @@ type SpellConsoleProps = {
   // attack(...) / skill(...), so the caller can start the matching cooldown.
   onAttackCast: () => void
   onSkillCast: () => void
+  // Set while the spell physically cannot land — the target has been walked
+  // out of range. Both boxes go read-only and say why, instead of a dead
+  // button with no explanation on it.
+  blockedReason?: string | null
+  // The dungeon-side layout (TargetPanel) has a fraction of the room the old
+  // full-screen battle screen had, so the editors start shorter there. The
+  // player can still drag any box taller — .spell-textarea is resizable.
+  compact?: boolean
 }
 
 function insertTab(code: string, el: HTMLTextAreaElement): { next: string; caret: number } {
@@ -70,6 +78,8 @@ export function SpellConsole({
   onSkillDamage,
   onAttackCast,
   onSkillCast,
+  blockedReason = null,
+  compact = false,
 }: SpellConsoleProps) {
   const [warming, setWarming] = useState(true)
 
@@ -154,16 +164,19 @@ export function SpellConsole({
         brief={attackTask.trial && <TrialBrief trial={attackTask.trial} code={attackBox.code} />}
         onChange={(code) => setAttackBox({ ...attackBox, code })}
         onRun={() => run(attackBox, setAttackBox, attackTask)}
+        compact={compact}
         label={
           warming
             ? 'กำลังเรียกพลังจากอีกมิติ...'
             : attackBox.casting
               ? 'กำลังร่ายคาถา...'
-              : attackCooldown > 0
-                ? `รอคูลดาวน์ (${Math.ceil(attackCooldown)}s)`
-                : 'ร่ายคาถา ⚡'
+              : blockedReason
+                ? blockedReason
+                : attackCooldown > 0
+                  ? `รอคูลดาวน์ (${Math.ceil(attackCooldown)}s)`
+                  : 'ร่ายคาถา ⚡'
         }
-        disabled={warming || attackBox.casting || attackCooldown > 0}
+        disabled={warming || attackBox.casting || attackCooldown > 0 || blockedReason != null}
       />
       <CodeBox
         title="สกิลพิเศษ"
@@ -171,16 +184,19 @@ export function SpellConsole({
         brief={skillTask.trial && <TrialBrief trial={skillTask.trial} code={skillBox.code} />}
         onChange={(code) => setSkillBox({ ...skillBox, code })}
         onRun={() => run(skillBox, setSkillBox, skillTask)}
+        compact={compact}
         label={
           warming
             ? 'กำลังเรียกพลังจากอีกมิติ...'
             : skillBox.casting
               ? 'กำลังร่ายคาถา...'
-              : skillCooldown > 0
-                ? `รอคูลดาวน์ (${Math.ceil(skillCooldown)}s)`
-                : 'ร่ายสกิลพิเศษ ✦'
+              : blockedReason
+                ? blockedReason
+                : skillCooldown > 0
+                  ? `รอคูลดาวน์ (${Math.ceil(skillCooldown)}s)`
+                  : 'ร่ายสกิลพิเศษ ✦'
         }
-        disabled={warming || skillBox.casting || skillCooldown > 0}
+        disabled={warming || skillBox.casting || skillCooldown > 0 || blockedReason != null}
       />
     </div>
   )
@@ -194,6 +210,7 @@ export function CodeBox({
   onRun,
   label,
   disabled,
+  compact = false,
 }: {
   title: string
   state: BoxState
@@ -204,6 +221,7 @@ export function CodeBox({
   onRun: () => void
   label: string
   disabled: boolean
+  compact?: boolean
 }) {
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== 'Tab') return
@@ -217,7 +235,7 @@ export function CodeBox({
   }
 
   return (
-    <div className="spell-box">
+    <div className={`spell-box${compact ? ' spell-box-compact' : ''}`}>
       <p className="spell-console-label">{title}</p>
       {brief}
       <textarea
@@ -229,7 +247,7 @@ export function CodeBox({
         disabled={state.casting}
         // Hard mode's editor starts with the โจทย์ as comments and the whole
         // spell still to write, so it gets more room than a one-blank skeleton.
-        rows={brief ? 12 : 6}
+        rows={compact ? (brief ? 9 : 5) : brief ? 12 : 6}
       />
       {(state.log.length > 0 || state.error) && (
         <div className="spell-log">

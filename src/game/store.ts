@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { useAuthStore } from '../auth/authStore'
 import { saveProgress, submitScore, type SaveData } from './persistence'
-import { LEVELS } from './levels'
+import { ALL_MONSTERS, LEVELS } from './levels'
 import { PLAYER_MAX_HP, BASE_ATTACK_POWER, SKILL_COOLDOWN_SECONDS, ATTACK_COOLDOWN_SECONDS } from './constants'
 import {
   DEFAULT_GENDER,
@@ -13,28 +13,36 @@ import {
 import { playAttackImpact, playPlayerHurt } from '../audio/soundEngine'
 import type { Difficulty } from './difficulty'
 
-export type CombatMonster = {
-  id: string
-  name: string
-  maxHp: number
-  attackInterval: number
-}
-
-// 'exam' sits between clearing a level and getting the next one: once the
-// last monster of a level is dead, leaving that fight drops the player into
-// the end-of-level exam (LevelExamOverlay) instead of straight into level
-// N+1. Nothing but passLevelExam() leaves this phase, so the exam is the only
-// door out of a finished level — including the last one, which reaches
-// 'victory' through it rather than around it.
-type GamePhase = 'exploring' | 'combat' | 'exam' | 'gameover' | 'victory'
+// Fighting is no longer a phase. There is no battle screen to cut away to:
+// the player picks a target, casts at it, and takes hits, all while standing
+// in the dungeon and free to walk away mid-fight — so 'exploring' *is* the
+// combat state (see the target lock below).
+//
+// 'exam' sits between clearing a level and getting the next one: the moment
+// the last monster of a level goes down, the player is dropped into the
+// end-of-level exam (LevelExamOverlay) instead of straight into level N+1.
+// Nothing but passLevelExam() leaves this phase, so the exam is the only door
+// out of a finished level — including the last one, which reaches 'victory'
+// through it rather than around it.
+type GamePhase = 'exploring' | 'exam' | 'gameover' | 'victory'
 
 type GameState = {
   phase: GamePhase
   currentLevel: number
-  activeMonsterId: string | null
+  // The locked target: the monster every spell in the code boxes lands on,
+  // and the only thing damageMonster() can hurt. Clicking a monster in the
+  // dungeon sets it, Tab cycles it, Escape and walking away clear it. Null
+  // means no target, which is what closes the target panel.
+  targetId: string | null
+  // Set when the *player* let go of the target on purpose (Escape, the panel's
+  // ✕). It stops CombatTicker's auto-lock from handing the same monster
+  // straight back on the next frame while they are still standing in its
+  // reach — which would make dismissing the panel mid-melee impossible.
+  // Cleared the moment nothing is attacking them any more, or the moment they
+  // pick a target themselves.
+  suppressAutoTarget: boolean
   monsterHp: Record<string, number>
   defeatedIds: Set<string>
-  fledMonsterId: string | null
   playerHp: number
   attackPower: number
   collectedPickupIds: Set<string>
@@ -43,10 +51,13 @@ type GameState = {
   // is never persisted to Supabase (see startAttackCooldown), it's short
   // enough that losing it on a page reload isn't worth a DB migration.
   attackCooldown: number
-  // Seconds until the current monster's next attack — driven by
-  // CombatTicker, displayed as a countdown in CombatOverlay. Never
-  // persisted, same reasoning as attackCooldown.
-  monsterAttackCountdown: number
+  // Seconds until each *engaged* monster's next swing, keyed by monster id —
+  // driven by CombatTicker, drawn as the little timer bar under a monster's
+  // nameplate. Only monsters currently in aggro range appear here (walking
+  // away empties it), and the ticker only pushes a new object when a
+  // displayed tenth-of-a-second actually changed, so this is not a
+  // per-frame re-render. Never persisted, same reasoning as attackCooldown.
+  monsterSwing: Record<string, number>
   characterClass: CharacterClass | null
   gender: CharacterGender
   skinColor: string
@@ -68,7 +79,12 @@ type GameState = {
   // player back into exactly whatever exploring/combat state they paused in.
   paused: boolean
 
-  enterCombat: (monster: CombatMonster) => void
+  setTarget: (monsterId: string | null) => void
+  // Escape, and the panel's ✕. Unlike setTarget(null) — which is also how the
+  // ticker drops a target that died or was walked away from — this one is a
+  // deliberate "leave me alone", and the auto-lock respects it.
+  clearTarget: () => void
+  allowAutoTarget: () => void
   damageMonster: (amount: number) => void
   damagePlayer: (amount: number) => void
   healPlayer: (amount: number) => void
@@ -77,10 +93,8 @@ type GameState = {
   startSkillCooldown: () => void
   startAttackCooldown: () => void
   tickCooldowns: (delta: number) => void
-  setMonsterAttackCountdown: (seconds: number) => void
-  exitCombat: () => void
+  setMonsterSwing: (swing: Record<string, number>) => void
   passLevelExam: () => void
-  clearFledMonster: () => void
   setPaused: (paused: boolean) => void
   // Admin-only jump to any level (see src/admin/). Not reachable from normal
   // play — the only way past a level's gate is passLevelExam().
@@ -146,16 +160,16 @@ async function persist(): Promise<boolean> {
 export const useGameStore = create<GameState>((set, get) => ({
   phase: 'exploring',
   currentLevel: 1,
-  activeMonsterId: null,
+  targetId: null,
+  suppressAutoTarget: false,
   monsterHp: {},
   defeatedIds: new Set(),
-  fledMonsterId: null,
   playerHp: PLAYER_MAX_HP,
   attackPower: BASE_ATTACK_POWER,
   collectedPickupIds: new Set(),
   skillCooldown: 0,
   attackCooldown: 0,
-  monsterAttackCountdown: 0,
+  monsterSwing: {},
   characterClass: null,
   gender: DEFAULT_GENDER,
   skinColor: DEFAULT_SKIN_COLOR,
@@ -165,34 +179,71 @@ export const useGameStore = create<GameState>((set, get) => ({
   saveLoaded: false,
   paused: false,
 
-  enterCombat: (monster) =>
-    set((state) => ({
-      phase: 'combat',
-      activeMonsterId: monster.id,
-      monsterHp: {
-        ...state.monsterHp,
-        [monster.id]: state.monsterHp[monster.id] ?? monster.maxHp,
-      },
-      monsterAttackCountdown: monster.attackInterval,
-    })),
-
-  damageMonster: (amount) => {
-    const { activeMonsterId, monsterHp, defeatedIds, currentLevel, characterClass } = get()
-    if (!activeMonsterId) return
-    if (amount > 0) playAttackImpact(characterClass)
-    const wasDefeated = defeatedIds.has(activeMonsterId)
-    const nextHp = Math.max(0, (monsterHp[activeMonsterId] ?? 0) - amount)
-    const nextDefeated = new Set(defeatedIds)
-    if (nextHp <= 0) nextDefeated.add(activeMonsterId)
+  // Locking a target is the whole "entering a fight" ceremony now: no phase
+  // change, no screen, nothing paused. Clicking a monster in the dungeon,
+  // Tab, and CombatTicker's auto-lock all land here.
+  //
+  // A monster's HP is seeded the first time it is ever targeted and kept
+  // afterwards — walk away from something at half health, come back an hour
+  // later, and it is still at half health.
+  setTarget: (monsterId) => {
+    if (monsterId == null) {
+      set({ targetId: null })
+      return
+    }
+    const monster = ALL_MONSTERS.find((m) => m.id === monsterId)
+    // Ignore anything that isn't a real monster, or one already dead — a
+    // corpse is not a target, and letting it become one would leave the panel
+    // open on a monster that is no longer in the dungeon.
+    if (!monster) return
+    const { defeatedIds, monsterHp, phase } = get()
+    if (defeatedIds.has(monsterId)) return
+    if (phase !== 'exploring') return
     set({
-      monsterHp: { ...monsterHp, [activeMonsterId]: nextHp },
+      targetId: monsterId,
+      // Choosing a target is itself the answer to "leave me alone".
+      suppressAutoTarget: false,
+      monsterHp: { ...monsterHp, [monsterId]: monsterHp[monsterId] ?? monster.maxHp },
+    })
+  },
+
+  clearTarget: () => set({ targetId: null, suppressAutoTarget: true }),
+
+  // Called by CombatTicker once nothing is in range any more: walking clear of
+  // the pack is what re-arms the auto-lock for the next one.
+  allowAutoTarget: () => set({ suppressAutoTarget: false }),
+
+  // Every spell lands on the locked target. With no target there is nothing
+  // to hit, which is also what makes casting at empty air harmless rather
+  // than an error.
+  damageMonster: (amount) => {
+    const { targetId, monsterHp, defeatedIds, currentLevel, characterClass } = get()
+    if (!targetId) return
+    if (amount > 0) playAttackImpact(characterClass)
+    const wasDefeated = defeatedIds.has(targetId)
+    const nextHp = Math.max(0, (monsterHp[targetId] ?? 0) - amount)
+    const nextDefeated = new Set(defeatedIds)
+    if (nextHp <= 0) nextDefeated.add(targetId)
+
+    const levelCleared = nextHp <= 0 && LEVELS[currentLevel - 1].monsters.every((m) => nextDefeated.has(m.id))
+
+    set({
+      monsterHp: { ...monsterHp, [targetId]: nextHp },
       defeatedIds: nextDefeated,
+      // A dead monster stops being the target the instant it drops: the panel
+      // closes, the corpse disappears, and the player is free to pick the
+      // next one. Nothing here waits on a "Continue" button any more.
+      targetId: nextHp <= 0 ? null : targetId,
+      // Clearing the last monster of a level is what opens that level's exam.
+      // currentLevel deliberately does not move — passLevelExam() is still the
+      // only thing that advances it, so a reload mid-exam lands back on the
+      // exam (see hydrateSave) rather than skipping it.
+      phase: levelCleared ? 'exam' : get().phase,
     })
 
     if (!wasDefeated && nextHp <= 0) {
       persist()
       const isLastLevel = currentLevel === LEVELS.length
-      const levelCleared = LEVELS[currentLevel - 1].monsters.every((m) => nextDefeated.has(m.id))
       if (isLastLevel && levelCleared) {
         const userId = useAuthStore.getState().session?.user.id
         if (userId) submitScore(userId, nextDefeated.size)
@@ -204,7 +255,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (amount > 0) playPlayerHurt()
     set((state) => {
       const nextHp = Math.max(0, state.playerHp - amount)
-      return { playerHp: nextHp, phase: nextHp <= 0 ? 'gameover' : state.phase }
+      if (nextHp > 0) return { playerHp: nextHp }
+      // Dying drops the target and every swing timer with it, so the game-over
+      // screen isn't sitting on top of a live target panel and a monster still
+      // counting down to its next hit.
+      return { playerHp: 0, phase: 'gameover', targetId: null, monsterSwing: {}, suppressAutoTarget: false }
     })
     persist()
   },
@@ -229,8 +284,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   // deals damage through damageMonster() directly and then calls this to
   // start the cooldown, instead of a single button action owning both.
   startSkillCooldown: () => {
-    const { phase } = get()
-    if (phase !== 'combat') return
+    if (get().phase !== 'exploring') return
     set({ skillCooldown: SKILL_COOLDOWN_SECONDS })
     persist()
   },
@@ -241,8 +295,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   // writing it to Supabase every time would be a lot of avoidable traffic
   // for a value that's fine to just reset to 0 on reload.
   startAttackCooldown: () => {
-    const { phase } = get()
-    if (phase !== 'combat') return
+    if (get().phase !== 'exploring') return
     set({ attackCooldown: ATTACK_COOLDOWN_SECONDS })
   },
 
@@ -252,30 +305,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       attackCooldown: state.attackCooldown > 0 ? Math.max(0, state.attackCooldown - delta) : state.attackCooldown,
     })),
 
-  setMonsterAttackCountdown: (seconds) => set({ monsterAttackCountdown: seconds }),
-
-  exitCombat: () => {
-    const { activeMonsterId, defeatedIds, currentLevel, playerHp } = get()
-    if (playerHp <= 0) return // already dead — the game-over overlay owns the reset from here
-    const levelCleared =
-      activeMonsterId != null &&
-      defeatedIds.has(activeMonsterId) &&
-      LEVELS[currentLevel - 1].monsters.every((m) => defeatedIds.has(m.id))
-
-    // Every monster down does not hand out the next level any more — it hands
-    // out the exam. currentLevel deliberately does not move here, so a reload
-    // mid-exam lands back on the exam (see hydrateSave) rather than skipping it.
-    if (levelCleared) {
-      set({ phase: 'exam', activeMonsterId: null, fledMonsterId: null })
-      return
-    }
-
-    set((state) => ({
-      phase: 'exploring',
-      activeMonsterId: null,
-      fledMonsterId: state.activeMonsterId,
-    }))
-  },
+  setMonsterSwing: (swing) => set({ monsterSwing: swing }),
 
   // The only exit from 'exam': called by LevelExamOverlay once the player's
   // own from-scratch code has satisfied every check for the chapter and put
@@ -287,18 +317,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (currentLevel < LEVELS.length) {
       set({
         phase: 'exploring',
-        activeMonsterId: null,
-        fledMonsterId: null,
+        targetId: null,
+        monsterSwing: {},
+        suppressAutoTarget: false,
         currentLevel: currentLevel + 1,
       })
       persist()
       return
     }
 
-    set({ phase: 'victory', activeMonsterId: null, fledMonsterId: null })
+    set({ phase: 'victory', targetId: null, monsterSwing: {}, suppressAutoTarget: false })
   },
-
-  clearFledMonster: () => set({ fledMonsterId: null }),
 
   setPaused: (paused) => set({ paused }),
 
@@ -308,9 +337,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   //
   // The phase is re-derived the same way hydrateSave does it: warping into a
   // level whose monsters are already dead has to land on that level's exam,
-  // because 'exam' is only ever entered by leaving a fight (exitCombat) and
-  // there are no fights left to leave. Without this the admin would arrive in
-  // an empty dungeon with no way forward.
+  // because 'exam' is only ever entered by the killing blow on a level's last
+  // monster (damageMonster) and there are none left to kill. Without this the
+  // admin would arrive in an empty dungeon with no way forward.
   warpToLevel: (level) => {
     const { playerHp, defeatedIds, currentLevel } = get()
     if (playerHp <= 0) return // dead — the game-over overlay owns the screen
@@ -321,8 +350,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       currentLevel: target,
       phase: cleared ? 'exam' : 'exploring',
-      activeMonsterId: null,
-      fledMonsterId: null,
+      targetId: null,
+      monsterSwing: {},
+      suppressAutoTarget: false,
       paused: false,
     })
     persist()
@@ -381,6 +411,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       // once and then remembers the answer.
       difficulty: save.difficulty,
       saveLoaded: true,
+      // Nothing about a fight survives a reload: the target lock and every
+      // swing timer are moment-to-moment state, and a monster's remaining HP
+      // was never persisted either (it re-seeds at full the next time it is
+      // targeted, same as before).
+      targetId: null,
+      monsterSwing: {},
+      suppressAutoTarget: false,
     })
   },
 
@@ -388,16 +425,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       phase: 'exploring',
       currentLevel: 1,
-      activeMonsterId: null,
+      targetId: null,
+      suppressAutoTarget: false,
       monsterHp: {},
       defeatedIds: new Set(),
-      fledMonsterId: null,
       playerHp: PLAYER_MAX_HP,
       attackPower: BASE_ATTACK_POWER,
       collectedPickupIds: new Set(),
       skillCooldown: 0,
       attackCooldown: 0,
-      monsterAttackCountdown: 0,
+      monsterSwing: {},
       paused: false,
     })
     persist()
@@ -410,16 +447,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       phase: 'exploring',
       currentLevel: 1,
-      activeMonsterId: null,
+      targetId: null,
+      suppressAutoTarget: false,
       monsterHp: {},
       defeatedIds: new Set(),
-      fledMonsterId: null,
       playerHp: PLAYER_MAX_HP,
       attackPower: BASE_ATTACK_POWER,
       collectedPickupIds: new Set(),
       skillCooldown: 0,
       attackCooldown: 0,
-      monsterAttackCountdown: 0,
+      monsterSwing: {},
       characterClass: null,
       gender: DEFAULT_GENDER,
       skinColor: DEFAULT_SKIN_COLOR,
