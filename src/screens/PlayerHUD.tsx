@@ -15,7 +15,7 @@ export function PlayerHUD() {
       </div>
       <div className="player-hud-labels">
         <span>HP {playerHp}/{PLAYER_MAX_HP}</span>
-        <span>ครีติคอล {attackPower}</span>
+        <span>ดาเมจ {attackPower}</span>
       </div>
     </div>
   )

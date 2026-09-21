@@ -58,6 +58,7 @@ const loadedSave = {
   shirtColor: null,
   characterName: 'Rin',
   difficulty: 'easy' as const,
+  lastPosition: null,
 }
 
 describe('useGameStore', () => {
@@ -254,6 +255,58 @@ describe('useGameStore', () => {
   // The admin warp (src/admin/) is the one thing in the game that moves
   // between levels without passing an exam, so what it does *not* touch
   // matters as much as what it does.
+  // Where the player was standing, so a reload or a fresh login puts them
+  // back on that spot. The spot only means anything on the level it was
+  // taken on, which is what most of these guard.
+  describe('saved position', () => {
+    it('stamps the spot with the current level and writes it', () => {
+      useGameStore.getState().hydrateSave(loadedSave)
+      vi.mocked(saveProgress).mockClear()
+
+      useGameStore.getState().recordPosition(-4.5, -17)
+
+      expect(useGameStore.getState().lastPosition).toEqual({ level: 2, x: -4.5, z: -17 })
+      expect(vi.mocked(saveProgress).mock.calls[0][1]).toMatchObject({
+        lastPosition: { level: 2, x: -4.5, z: -17 },
+      })
+    })
+
+    it('records nothing before this account’s save has been read', () => {
+      // Same rule as every other write: the placeholder state before loading
+      // must never overwrite a real save.
+      useGameStore.getState().recordPosition(3, 3)
+      expect(useGameStore.getState().lastPosition).toBeNull()
+      expect(saveProgress).not.toHaveBeenCalled()
+    })
+
+    it('comes back from the save, but not from one that died', () => {
+      useGameStore.getState().hydrateSave({ ...loadedSave, lastPosition: { level: 2, x: 1, z: -9 } })
+      expect(useGameStore.getState().lastPosition).toEqual({ level: 2, x: 1, z: -9 })
+
+      // A 0-HP save goes through the game-over reset, which starts at level
+      // 1's entrance — a spot from the run that just ended has no place there.
+      useGameStore.getState().hydrateSave({ ...loadedSave, playerHp: 0, lastPosition: { level: 2, x: 1, z: -9 } })
+      expect(useGameStore.getState().lastPosition).toBeNull()
+    })
+
+    it('is forgotten on every level change and on restart', () => {
+      const spot = { level: 1, x: 2, z: -6 }
+
+      useGameStore.setState({ currentLevel: 1, playerHp: 100, phase: 'exploring', lastPosition: spot })
+      useGameStore.getState().warpToLevel(3)
+      expect(useGameStore.getState().lastPosition, 'warp').toBeNull()
+
+      clearLevel(0)
+      useGameStore.setState({ lastPosition: spot })
+      useGameStore.getState().passLevelExam()
+      expect(useGameStore.getState().lastPosition, 'next level').toBeNull()
+
+      useGameStore.setState({ lastPosition: spot })
+      useGameStore.getState().restart()
+      expect(useGameStore.getState().lastPosition, 'restart').toBeNull()
+    })
+  })
+
   describe('warpToLevel', () => {
     it('jumps to any level without disturbing progress', () => {
       useGameStore.setState({ currentLevel: 1, playerHp: 100, defeatedIds: new Set(['slime-1']), phase: 'exploring' })
@@ -375,6 +428,7 @@ describe('useGameStore', () => {
       shirtColor: null,
       characterName: 'Rin',
       difficulty: 'hard',
+      lastPosition: null,
     })
     const s = useGameStore.getState()
     expect(s.phase).toBe('exam')
@@ -395,6 +449,7 @@ describe('useGameStore', () => {
       shirtColor: null,
       characterName: 'Shade',
       difficulty: 'easy',
+      lastPosition: null,
     })
     const s = useGameStore.getState()
     expect(s.phase).toBe('gameover')
@@ -418,6 +473,7 @@ describe('useGameStore', () => {
       // A save older than migrations_011 never chose a difficulty, which is
       // what puts the picker on screen once (see App.tsx).
       difficulty: null,
+      lastPosition: null,
     })
     expect(useGameStore.getState().phase).toBe('exploring')
   })

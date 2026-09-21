@@ -19,6 +19,30 @@ export type SaveData = {
   // null = never chosen (or a save older than migrations_011). The game asks
   // once on DifficultySelect and remembers the answer from then on.
   difficulty: Difficulty | null
+  // Where the player was last standing (migrations_013). null = start at the
+  // level's spawn: a brand-new save, a save older than the column, or one
+  // cleared by a restart / level change.
+  lastPosition: SavedPosition | null
+}
+
+// A spot on the floor of one particular level. Only ever honoured on the level
+// it was recorded on — see GameScene's first-frame placement.
+export type SavedPosition = {
+  level: number
+  x: number
+  z: number
+}
+
+// The column is jsonb and written by every client that has ever run, so what
+// comes back is checked rather than trusted: anything that is not three finite
+// numbers is treated as "no saved spot" and the player simply starts at the
+// entrance. A corrupt position must never be able to strand anyone.
+export function parseSavedPosition(value: unknown): SavedPosition | null {
+  if (!value || typeof value !== 'object') return null
+  const { level, x, z } = value as Record<string, unknown>
+  if (typeof level !== 'number' || typeof x !== 'number' || typeof z !== 'number') return null
+  if (!Number.isInteger(level) || !Number.isFinite(x) || !Number.isFinite(z)) return null
+  return { level, x, z }
 }
 
 // Running against a project that has not had every migration applied yet.
@@ -46,6 +70,10 @@ const OPTIONAL_COLUMNS = {
   difficulty: {
     consequence: 'the chosen difficulty will not be remembered between sessions',
     migration: 'supabase/migrations_011_difficulty.sql',
+  },
+  last_position: {
+    consequence: 'every session will start at the level entrance instead of where the player left off',
+    migration: 'supabase/migrations_013_last_position.sql',
   },
 } as const
 
@@ -102,6 +130,7 @@ export async function loadSave(userId: string): Promise<SaveData> {
     shirt_color: string | null
     character_name: string | null
     difficulty: string | null
+    last_position: unknown
   }>
 
   const read = async (columns: string[]) => {
@@ -147,6 +176,7 @@ export async function loadSave(userId: string): Promise<SaveData> {
     // migrations_011 — reads as "never chosen", which shows the picker once
     // rather than silently deciding for the player.
     difficulty: isDifficulty(data?.difficulty) ? data.difficulty : null,
+    lastPosition: parseSavedPosition(data?.last_position),
   }
 }
 
@@ -172,6 +202,7 @@ export async function saveProgress(userId: string, save: SaveData): Promise<bool
   const optionalValues: Record<OptionalColumn, unknown> = {
     shirt_color: save.shirtColor,
     difficulty: save.difficulty,
+    last_position: save.lastPosition,
   }
 
   const write = (columns: OptionalColumn[]) => {

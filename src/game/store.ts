@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { useAuthStore } from '../auth/authStore'
-import { saveProgress, submitScore, type SaveData } from './persistence'
+import { saveProgress, submitScore, type SavedPosition, type SaveData } from './persistence'
 import { ALL_MONSTERS, LEVELS } from './levels'
 import { PLAYER_MAX_HP, BASE_ATTACK_POWER, SKILL_COOLDOWN_SECONDS, ATTACK_COOLDOWN_SECONDS } from './constants'
 import {
@@ -72,6 +72,11 @@ type GameState = {
   // Unlike the character it is not a one-time decision: the pause menu can
   // switch it mid-run, and the next fight (and the next box reset) follows.
   difficulty: Difficulty | null
+  // The spot the player was last recorded standing on (see GameScene), so a
+  // reload or a fresh login puts them back there instead of at the entrance.
+  // Tagged with its level and cleared whenever the level changes or the run
+  // restarts — a spot is only ever meaningful on the floor it was taken on.
+  lastPosition: SavedPosition | null
   saveLoaded: boolean
   // Mid-game pause: freezes player movement, the combat attack timer, and
   // exploration triggers (see the `paused` checks in Player.tsx, GameScene.tsx,
@@ -107,6 +112,7 @@ type GameState = {
     characterName: string,
   ) => void
   setDifficulty: (difficulty: Difficulty) => void
+  recordPosition: (x: number, z: number) => void
   // Editing an existing character from the profile screen. Deliberately does
   // not touch characterName: that one is claimed at creation and is the only
   // part of a character another player can collide with.
@@ -140,6 +146,7 @@ async function persist(): Promise<boolean> {
     shirtColor,
     characterName,
     difficulty,
+    lastPosition,
   } = useGameStore.getState()
   return saveProgress(userId, {
     defeatedMonsterIds: [...defeatedIds],
@@ -154,6 +161,7 @@ async function persist(): Promise<boolean> {
     shirtColor,
     characterName,
     difficulty,
+    lastPosition,
   })
 }
 
@@ -176,6 +184,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   shirtColor: null,
   characterName: null,
   difficulty: null,
+  lastPosition: null,
   saveLoaded: false,
   paused: false,
 
@@ -321,6 +330,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         monsterSwing: {},
         suppressAutoTarget: false,
         currentLevel: currentLevel + 1,
+        // A new level starts at its entrance, and a reload before the first
+        // few steps must not hand back a spot from the level just left.
+        lastPosition: null,
       })
       persist()
       return
@@ -354,7 +366,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       monsterSwing: {},
       suppressAutoTarget: false,
       paused: false,
+      lastPosition: null,
     })
+    persist()
+  },
+
+  // Called by GameScene every few steps of walking (and when the tab is
+  // hidden). Always stamped with the level the player is on *now*, which is
+  // what lets a stale spot be recognised and ignored after a level change.
+  recordPosition: (x, z) => {
+    const { currentLevel, saveLoaded } = get()
+    if (!saveLoaded) return
+    set({ lastPosition: { level: currentLevel, x, z } })
     persist()
   },
 
@@ -410,6 +433,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       // player ever reached the picker), which sends them to DifficultySelect
       // once and then remembers the answer.
       difficulty: save.difficulty,
+      // A save that died at 0 HP goes through the game-over reset anyway, so
+      // there is no spot to return to.
+      lastPosition: save.playerHp <= 0 ? null : save.lastPosition,
       saveLoaded: true,
       // Nothing about a fight survives a reload: the target lock and every
       // swing timer are moment-to-moment state, and a monster's remaining HP
@@ -436,6 +462,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       attackCooldown: 0,
       monsterSwing: {},
       paused: false,
+      // Back to level 1's entrance, not to wherever the last run fell.
+      lastPosition: null,
     })
     persist()
   },
@@ -463,6 +491,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       shirtColor: null,
       characterName: null,
       difficulty: null,
+      lastPosition: null,
       saveLoaded: false,
       paused: false,
     }),

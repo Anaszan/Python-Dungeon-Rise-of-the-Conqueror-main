@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Sparkles } from '@react-three/drei'
 import { Ground } from './Ground'
@@ -33,8 +33,10 @@ import {
 import type { PropProps } from './DungeonProps'
 import type { DecorationKind } from './levels'
 import { LEVELS } from './levels'
+import { levelColliders } from './propCollision'
 import { useGameStore } from './store'
-import { PICKUP_TRIGGER_DISTANCE } from './constants'
+import { PICKUP_TRIGGER_DISTANCE, POSITION_SAVE_DISTANCE, POSITION_SAVE_MIN_INTERVAL_SECONDS } from './constants'
+import { canStandAt } from './dungeon'
 
 // Every prop takes the same props (see PropProps), so a level's decoration
 // list maps straight through this table — adding a prop kind is a new entry
@@ -65,12 +67,46 @@ export function GameScene() {
   const phase = useGameStore((s) => s.phase)
   const currentLevel = useGameStore((s) => s.currentLevel)
   const levelData = LEVELS[currentLevel - 1]
+  // Walls plus every solid prop (coffins, shelves, statues...) — see
+  // propCollision.ts. Memoized per level: Player tests against this list
+  // every frame, and rebuilding it each render would be pointless churn.
+  const colliders = useMemo(() => levelColliders(levelData), [levelData])
   const theme = levelData.theme
   const prevPhase = useRef(phase)
   const prevLevel = useRef(currentLevel)
+  // Position saving (see POSITION_SAVE_DISTANCE): where the last save put the
+  // player, and when. `placed` is false until the first frame has decided
+  // where this mount starts — the saved spot or the entrance.
+  const placed = useRef(false)
+  const lastSavedAt = useRef({ x: 0, z: 0 })
+  const lastSaveTime = useRef(0)
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     const state = useGameStore.getState()
+
+    // First frame of this mount: put the player back where they left off.
+    // Only a spot recorded on *this* level counts, and only if it is still
+    // somewhere a body can stand — a level edit (a new coffin, a moved wall)
+    // since the spot was saved must never wedge the player inside something.
+    // Anything else starts at the entrance, as it always did.
+    //
+    // Done here rather than in an effect for the same reason the respawn
+    // below is: the frame loop is what reads the position, so the frame loop
+    // is what has to set it before anything else looks.
+    if (!placed.current) {
+      placed.current = true
+      const level = LEVELS[state.currentLevel - 1]
+      const saved = state.lastPosition
+      const [, spawnY] = level.spawnPosition
+      if (saved && saved.level === state.currentLevel && canStandAt(saved.x, saved.z, level.regions, colliders)) {
+        playerPos.current.set(saved.x, spawnY, saved.z)
+      } else {
+        playerPos.current.set(...level.spawnPosition)
+      }
+      lastSavedAt.current = { x: playerPos.current.x, z: playerPos.current.z }
+      lastSaveTime.current = clock.elapsedTime
+    }
+
     if (state.paused) return
 
     // Reposition the player back to the level's spawn point the instant a
@@ -86,11 +122,28 @@ export function GameScene() {
     const levelChanged = prevLevel.current !== state.currentLevel
     if (restarted || levelChanged) {
       playerPos.current.set(...LEVELS[state.currentLevel - 1].spawnPosition)
+      // The distance for the next save is measured from here, not from the
+      // spot on the level (or the run) just left behind.
+      lastSavedAt.current = { x: playerPos.current.x, z: playerPos.current.z }
     }
     prevPhase.current = state.phase
     prevLevel.current = state.currentLevel
 
     if (state.phase !== 'exploring') return
+
+    // Walked far enough since the last save → save again. Measured as a
+    // straight line from the last saved spot, so pacing back and forth in one
+    // room does not keep writing the same few metres over and over.
+    const movedX = playerPos.current.x - lastSavedAt.current.x
+    const movedZ = playerPos.current.z - lastSavedAt.current.z
+    if (
+      movedX * movedX + movedZ * movedZ >= POSITION_SAVE_DISTANCE * POSITION_SAVE_DISTANCE &&
+      clock.elapsedTime - lastSaveTime.current >= POSITION_SAVE_MIN_INTERVAL_SECONDS
+    ) {
+      lastSavedAt.current = { x: playerPos.current.x, z: playerPos.current.z }
+      lastSaveTime.current = clock.elapsedTime
+      state.recordPosition(playerPos.current.x, playerPos.current.z)
+    }
 
     const frameLevelData = LEVELS[state.currentLevel - 1]
 
@@ -109,6 +162,26 @@ export function GameScene() {
       }
     }
   })
+
+  // Closing the tab, switching away, or locking the phone: save the spot
+  // right now, even if the player has not walked a full save distance yet.
+  // 'hidden' fires before the page is torn down, which gives the request a
+  // chance to leave; it is best-effort, and the distance-based saves above
+  // are what guarantee the player never loses more than a few steps.
+  useEffect(() => {
+    const saveNow = () => {
+      if (document.visibilityState !== 'hidden') return
+      const state = useGameStore.getState()
+      if (!placed.current || state.phase !== 'exploring') return
+      const movedX = playerPosition.x - lastSavedAt.current.x
+      const movedZ = playerPosition.z - lastSavedAt.current.z
+      if (movedX * movedX + movedZ * movedZ < 0.25) return // barely moved: nothing new to say
+      lastSavedAt.current = { x: playerPosition.x, z: playerPosition.z }
+      state.recordPosition(playerPosition.x, playerPosition.z)
+    }
+    document.addEventListener('visibilitychange', saveNow)
+    return () => document.removeEventListener('visibilitychange', saveNow)
+  }, [])
 
   // Tab walks down the monsters in range, nearest first — the one keyboard
   // habit an RO player brings with them. Bound here rather than in the target
@@ -178,7 +251,7 @@ export function GameScene() {
         floorTextureUrl={levelData.floorTextureUrl}
         wallTextureUrl={levelData.wallTextureUrl}
       />
-      <Player positionRef={playerPos} regions={levelData.regions} walls={levelData.walls} />
+      <Player positionRef={playerPos} regions={levelData.regions} walls={colliders} />
       <CombatTicker />
       {/* Both live inside the canvas because both are anchored to points in
           the world: the code boxes ride along beside the targeted monster,

@@ -29,6 +29,14 @@ export const TARGET_LOCK_RANGE = 10
 export const TARGET_DROP_RANGE = 13
 export const PICKUP_TRIGGER_DISTANCE = 1.0
 
+// Where the player is standing gets saved (GameScene → store.recordPosition)
+// once they have walked this far from the last saved spot — about two-thirds
+// of a second at PLAYER_SPEED — and never more often than the interval, so a
+// long walk down a corridor is a handful of writes rather than one per frame.
+// Coming back after a crash or a closed tab costs at most this much walking.
+export const POSITION_SAVE_DISTANCE = 3
+export const POSITION_SAVE_MIN_INTERVAL_SECONDS = 2
+
 export const PLAYER_MAX_HP = 200
 export const BASE_ATTACK_POWER = 30
 

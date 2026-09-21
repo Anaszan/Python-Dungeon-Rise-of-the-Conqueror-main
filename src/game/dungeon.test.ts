@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { canStandAt, hitsWall, isWalkable, PLAYER_RADIUS, WALL_THICKNESS } from './dungeon'
 import { LEVELS } from './levels'
 import { MONSTER_AGGRO_RANGE, PICKUP_TRIGGER_DISTANCE } from './constants'
+import { levelColliders, propColliders } from './propCollision'
 
 // canStandAt() keeps the player's whole body out of the walls, which also
 // means it narrows every doorway by the player's own half-width on each side.
@@ -11,11 +12,16 @@ import { MONSTER_AGGRO_RANGE, PICKUP_TRIGGER_DISTANCE } from './constants'
 // Flood-fills the standable space on a 0.1 grid from the spawn point
 // (4-neighbour, matching the axis-at-a-time movement in Player.tsx), then
 // checks every monster and pickup can be triggered from somewhere in it.
+//
+// It floods against levelColliders() — walls *and* solid props — the exact list
+// Player.tsx moves against, so a coffin dropped across a corridor or a
+// bookshelf standing on a monster fails here instead of in someone's run.
 const STEP = 0.1
 const key = (ix: number, iz: number) => `${ix},${iz}`
 
 function standableCells(level: (typeof LEVELS)[number]) {
-  const { regions, walls } = level
+  const { regions } = level
+  const walls = levelColliders(level)
   const [sx, , sz] = level.spawnPosition
   const start: [number, number] = [Math.round(sx / STEP), Math.round(sz / STEP)]
   expect(canStandAt(start[0] * STEP, start[1] * STEP, regions, walls), `${level.name}: spawn`).toBe(true)
@@ -93,6 +99,29 @@ describe('wall collision', () => {
   })
 })
 
+describe('prop collision', () => {
+  it('blocks the player at a solid prop and lets them through a floor decal', () => {
+    const coffin = propColliders([{ kind: 'coffin', position: [0, 0, 0] }])
+    expect(hitsWall(0, 0, coffin)).toBe(true)
+    // Long side runs along z: 2.05 deep, so 1 unit up the lid is still coffin…
+    expect(hitsWall(0, 1, coffin)).toBe(true)
+    // …but a body's width past its narrow side is clear.
+    expect(hitsWall(0.475 + PLAYER_RADIUS + 0.01, 0, coffin)).toBe(false)
+
+    expect(propColliders([{ kind: 'runeCircle', position: [0, 0, 0] }])).toEqual([])
+    expect(propColliders([{ kind: 'wisp', position: [0, 1.4, 0] }])).toEqual([])
+  })
+
+  it('turns the box with the prop', () => {
+    // A coffin laid east-west has to block along x, not along z.
+    const [box] = propColliders([{ kind: 'coffin', position: [3, 0, -5], rotationY: Math.PI / 2 }])
+    expect(box.x).toBe(3)
+    expect(box.z).toBe(-5)
+    expect(box.width).toBeCloseTo(2.05)
+    expect(box.depth).toBeCloseTo(0.95)
+  })
+})
+
 describe.each(LEVELS)('level $level ($name)', (level) => {
   const canReach = reachable(level)
 
@@ -104,10 +133,10 @@ describe.each(LEVELS)('level $level ($name)', (level) => {
     expect(canReach(pickup.position[0], pickup.position[2], PICKUP_TRIGGER_DISTANCE)).toBe(true)
   })
 
-  it('has no standable spot that overlaps a wall', () => {
+  it('has no standable spot that overlaps a wall or a solid prop', () => {
     const offenders = [...standableCells(level)].filter((k) => {
       const [ix, iz] = k.split(',').map(Number)
-      return hitsWall(ix * STEP, iz * STEP, level.walls, 0)
+      return hitsWall(ix * STEP, iz * STEP, levelColliders(level), 0)
     })
     expect(offenders).toEqual([])
   })
