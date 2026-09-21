@@ -34,7 +34,7 @@ export function LandingPage({ loading, onEnter }: { loading: boolean; onEnter: (
               <span className="landing-mock-dot" />
             </div>
             <div className="landing-mock-body">
-              <Mentor compact lines={['เขียนโค้ด Python ของเจ้าเอง แล้วร่ายใส่ Goblin ได้เลย']} />
+              <Mentor compact voice={false} lines={['เขียนโค้ด Python ของเจ้าเอง แล้วร่ายใส่ Goblin ได้เลย']} />
               <div className="landing-mock-combat">
                 <p className="landing-mock-monster">Goblin</p>
                 <div className="hp-bar-track">

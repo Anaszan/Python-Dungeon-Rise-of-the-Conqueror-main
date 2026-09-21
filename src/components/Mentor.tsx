@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { speakMentorLine, stopMentorVoice } from '../audio/mentorVoice'
 
 const TYPE_SPEED_MS = 26
 
@@ -83,19 +84,54 @@ export function Mentor({
   name = 'อาจารย์เมอร์ลิน',
   lines,
   compact = false,
+  voice = true,
   onFinish,
 }: {
   name?: string
   lines: string[]
   compact?: boolean
+  // Read each line aloud (see audio/mentorVoice.ts). Off for the landing
+  // page's one-line teaser, which plays before the player has touched
+  // anything — browsers block speech without a user gesture, and a voice
+  // starting up on a marketing page would be unwelcome even where they don't.
+  voice?: boolean
   onFinish?: () => void
 }) {
   const [lineIndex, setLineIndex] = useState(0)
   const [displayed, setDisplayed] = useState('')
+  const [speaking, setSpeaking] = useState(false)
+  // Which line's speech is current. A cut-off line reports its end
+  // asynchronously, and without this check that late "stopped" could land
+  // after the next line has already started and freeze the avatar's mouth
+  // mid-sentence.
+  const speechRun = useRef(0)
 
   const fullLine = lines[lineIndex] ?? ''
   const talking = displayed.length < fullLine.length
   const isLastLine = lineIndex >= lines.length - 1
+
+  // Spoken from the moment a line starts typing. Skipping the typewriter by
+  // tapping does not cut the voice off (it only fills in the text); moving on
+  // to the next line does, and so does leaving the screen.
+  useEffect(() => {
+    const run = ++speechRun.current
+    const text = lines[lineIndex]
+    if (!voice || !text) return
+    const started = speakMentorLine(text, {
+      onStart: () => {
+        if (speechRun.current === run) setSpeaking(true)
+      },
+      onEnd: () => {
+        if (speechRun.current === run) setSpeaking(false)
+      },
+    })
+    if (!started) setSpeaking(false)
+    return () => {
+      stopMentorVoice()
+      setSpeaking(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineIndex, voice])
 
   useEffect(() => {
     setLineIndex(0)
@@ -129,7 +165,9 @@ export function Mentor({
 
   return (
     <div className={`mentor-row ${compact ? 'mentor-row-compact' : ''}`}>
-      <MentorAvatar talking={talking} compact={compact} />
+      {/* The mouth moves for as long as either is going: the text typing out,
+          or the voice still reading it (usually the longer of the two). */}
+      <MentorAvatar talking={talking || speaking} compact={compact} />
       <div className="mentor-bubble" onClick={handleAdvance}>
         <p className="mentor-name">{name}</p>
         <p className="mentor-text">

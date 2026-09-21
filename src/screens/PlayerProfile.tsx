@@ -99,7 +99,7 @@ export function PlayerProfile() {
                   {classLabel} · {genderLabel}
                 </div>
                 <div className="profile-stats-row">
-                  <span>ครีติคอล {attackPower}</span>
+                  <span> ดาเมจ {attackPower}</span>
                   <span>
                     HP {playerHp}/{PLAYER_MAX_HP}
                   </span>
