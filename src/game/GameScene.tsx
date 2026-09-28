@@ -136,7 +136,7 @@ export function GameScene() {
       lastSaveTime.current = clock.elapsedTime
     }
 
-    if (state.paused) return
+    if (state.paused || state.bossReveal) return
 
     // Reposition the player back to the level's spawn point the instant a
     // restart or level-advance is observed, right here in the frame loop —

@@ -2481,15 +2481,47 @@ canvas {
   gap: 10px;
 }
 
+/* Each level is a card now: warp on top, reset underneath. The card carries
+   the border so the two buttons read as one level rather than two rows. */
+.admin-warp-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.admin-reset-btn {
+  padding: 7px 12px;
+  border: none;
+  border-top: 1px dashed var(--gold-dim);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--parchment-dim);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-reset-btn:hover:not(:disabled) {
+  background: rgba(184, 38, 44, 0.25);
+  color: var(--parchment-text);
+}
+
+.admin-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .admin-warp-btn {
   display: flex;
   flex-direction: column;
   gap: 3px;
   text-align: left;
   padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--gold-dim);
-  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  background: none;
   color: var(--parchment-text);
   font: inherit;
   cursor: pointer;
@@ -2588,4 +2620,143 @@ canvas {
 
 .admin-badge-win {
   color: var(--gold-bright);
+}
+
+/* --- บอสปรากฏตัว (screens/BossIntro.tsx) ----------------------------------
+   The level's boss walking in. Sits above everything in the dungeon but below
+   the modal overlays (game over, victory, admin), because it is a moment in
+   the game rather than a screen that replaces it — the dungeon stays visible
+   between the letterbox bars. */
+
+.boss-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 75;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.boss-intro-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 14vh;
+  background: #05030a;
+  animation: boss-bar-in 420ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.boss-intro-bar-top {
+  top: 0;
+}
+
+.boss-intro-bar-bottom {
+  bottom: 0;
+}
+
+@keyframes boss-bar-in {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.boss-intro-bar-top {
+  transform-origin: top;
+}
+
+.boss-intro-bar-bottom {
+  transform-origin: bottom;
+}
+
+.boss-intro-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 24px;
+  text-align: center;
+  /* The red wash behind the name, so it reads against whatever room the
+     player happens to be standing in. */
+  background: radial-gradient(ellipse at 50% 50%, rgba(120, 12, 24, 0.85) 0%, rgba(5, 3, 10, 0) 70%);
+  animation: boss-intro-in 600ms ease-out both;
+}
+
+@keyframes boss-intro-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.boss-intro-eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--hp-red-bright);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.boss-intro-art {
+  width: clamp(120px, 26vh, 240px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.8));
+  animation: boss-art-in 700ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes boss-art-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(1.12);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.boss-intro-name {
+  margin: 0;
+  font-family: 'Cinzel', 'Noto Sans Thai', serif;
+  font-size: clamp(28px, 6vw, 56px);
+  color: #fff0d0;
+  text-shadow:
+    0 0 18px rgba(232, 72, 63, 0.8),
+    0 3px 10px rgba(0, 0, 0, 0.95);
+}
+
+.boss-intro-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--parchment-text);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95);
+}
+
+.boss-intro-skip {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--parchment-dim);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+
+/* The badge on the target panel while the boss is the locked target: this
+   fight does not take the chapter's fill-in-the-blank skeleton, in either
+   difficulty. */
+.target-badge-boss {
+  background: rgba(184, 38, 44, 0.85);
+  border-color: var(--hp-red-bright);
+  color: #ffe9a8;
+  font-weight: 700;
 }

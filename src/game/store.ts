@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { useAuthStore } from '../auth/authStore'
 import { saveProgress, submitScore, type SavedPosition, type SaveData } from './persistence'
-import { ALL_MONSTERS, bossIsSealed, LEVELS } from './levels'
+import { ALL_MONSTERS, bossIsSealed, bossOf, LEVELS } from './levels'
 import { PLAYER_MAX_HP, BASE_ATTACK_POWER, SKILL_COOLDOWN_SECONDS, ATTACK_COOLDOWN_SECONDS } from './constants'
 import {
   DEFAULT_GENDER,
@@ -75,6 +75,12 @@ type GameState = {
   // Tagged with its level and cleared whenever the level changes or the run
   // restarts — a spot is only ever meaningful on the floor it was taken on.
   lastPosition: SavedPosition | null
+  // The boss whose seal just broke, for as long as its entrance is playing
+  // (BossIntro). Everything that moves or swings treats this like a pause —
+  // the player watches the thing walk in rather than being hit by it
+  // mid-cutscene. null the rest of the time, and never persisted: a reload
+  // during those four seconds simply skips them.
+  bossReveal: string | null
   saveLoaded: boolean
   // Mid-game pause: freezes player movement, the combat attack timer, and
   // exploration triggers (see the `paused` checks in Player.tsx, GameScene.tsx,
@@ -97,7 +103,11 @@ type GameState = {
   startAttackCooldown: () => void
   tickCooldowns: (delta: number) => void
   setMonsterSwing: (swing: Record<string, number>) => void
+  endBossReveal: () => void
   setPaused: (paused: boolean) => void
+  // Admin-only: puts every monster of one level back on its feet, on this
+  // account's own save (see src/admin/).
+  resetLevelMonsters: (level: number) => void
   // Admin-only jump to any level (see src/admin/). Not reachable from normal
   // play — the only way onward is killing the level's boss.
   warpToLevel: (level: number) => void
@@ -182,6 +192,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   characterName: null,
   difficulty: null,
   lastPosition: null,
+  bossReveal: null,
   saveLoaded: false,
   paused: false,
 
@@ -241,6 +252,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     const killedBoss = nextHp <= 0 && !wasDefeated && ALL_MONSTERS.find((m) => m.id === targetId)?.boss === true
     const isLastLevel = currentLevel === LEVELS.length
 
+    // This kill cleared the floor: the level's boss is no longer sealed, and
+    // its entrance plays before anything else happens. Computed from the
+    // *next* defeated set against the current one, so it fires exactly once —
+    // on the blow that broke the seal, not on every later hit.
+    const level = LEVELS[currentLevel - 1]
+    const boss = bossOf(level)
+    const sealJustBroke =
+      nextHp <= 0 &&
+      !wasDefeated &&
+      boss != null &&
+      bossIsSealed(level, defeatedIds) &&
+      !bossIsSealed(level, nextDefeated)
+
     set({
       monsterHp: { ...monsterHp, [targetId]: nextHp },
       defeatedIds: nextDefeated,
@@ -248,6 +272,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       // closes, the corpse disappears, and the player is free to pick the
       // next one. Nothing here waits on a "Continue" button any more.
       targetId: nextHp <= 0 ? null : targetId,
+      ...(sealJustBroke ? { bossReveal: boss!.id, monsterSwing: {} } : {}),
       // Straight into the next level's chapter intro (App.tsx watches
       // currentLevel), or into the victory screen after the last boss. HP,
       // attack power and the skill cooldown all carry over, exactly as they
@@ -330,7 +355,39 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setMonsterSwing: (swing) => set({ monsterSwing: swing }),
 
+  // The cutscene is over (it ran its course, or the player skipped it) and the
+  // dungeon starts moving again.
+  endBossReveal: () => set({ bossReveal: null }),
+
   setPaused: (paused) => set({ paused }),
+
+  // Admin-only (src/admin/): stands every monster of one level back up on this
+  // account's own save, so a level can be replayed without starting a whole
+  // new run. Their HP is cleared too — a monster left at 3 HP from last time
+  // is not "reset" — and the level's boss goes back behind its seal by itself,
+  // since the seal is derived from who is dead rather than stored.
+  //
+  // Pickups are deliberately left collected: HP and attack power carry over,
+  // so handing them back would be a way to farm power, not a way to replay.
+  resetLevelMonsters: (level) => {
+    const target = Math.min(Math.max(Math.round(level), 1), LEVELS.length)
+    const { defeatedIds, monsterHp, targetId } = get()
+    const ids = new Set(LEVELS[target - 1].monsters.map((m) => m.id))
+
+    const nextDefeated = new Set([...defeatedIds].filter((id) => !ids.has(id)))
+    const nextHp = Object.fromEntries(Object.entries(monsterHp).filter(([id]) => !ids.has(id)))
+
+    set({
+      defeatedIds: nextDefeated,
+      monsterHp: nextHp,
+      // A boss that was mid-fight when its floor was reset is sealed again
+      // the moment its minions are back, so the lock has to let go.
+      targetId: targetId && ids.has(targetId) ? null : targetId,
+      monsterSwing: {},
+      bossReveal: null,
+    })
+    persist()
+  },
 
   // Drops the player at the start of any level, for testing. Nothing else is
   // touched — HP, attack power, defeated monsters and collected pickups all
@@ -446,6 +503,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       attackCooldown: 0,
       monsterSwing: {},
       paused: false,
+      bossReveal: null,
       // Back to level 1's entrance, not to wherever the last run fell.
       lastPosition: null,
     })
@@ -476,6 +534,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       characterName: null,
       difficulty: null,
       lastPosition: null,
+      bossReveal: null,
       saveLoaded: false,
       paused: false,
     }),

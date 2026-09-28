@@ -624,8 +624,153 @@ export function missingCheck(trial: TrialSpec, code: string): CodeCheck | undefi
   return trial.checks.find((c) => !c.pattern.test(source))
 }
 
-// What one code box should start out holding, for either difficulty. `trial`
-// is null in easy mode, which is what tells the UI to render a plain
+// The boss's own โจทย์ — what the sealed door used to ask, now asked by the
+// thing standing in the doorway.
+//
+// This is the old end-of-level exam, kept word for word: its brief, its
+// checks and its hints. The door is gone, but what it was *for* is not — one
+// fight per level where the player writes that chapter's whole spell from
+// scratch, with nothing to fill in and a hint button for when they are stuck.
+//
+// Unlike everything else in this file it ignores the difficulty setting: an
+// easy-mode player gets the same from-scratch demand here as a hard-mode one.
+// The boss is the exam, and an exam you can pass by editing one number is not
+// an exam. What easy mode still gets is this: the boss is the *only* fight
+// that asks it.
+type BossBrief = {
+  brief: string[]
+  checks: CodeCheck[]
+  hints: string[]
+}
+
+const BOSS_BRIEFS: Record<number, BossBrief> = {
+  // บทที่ 2 — ตัวแปรและชนิดข้อมูล
+  2: {
+    brief: [
+      'สร้างตัวแปรของเจ้าเองเพื่อเก็บพลังโจมตี โดยคำนวณจาก atk',
+      'รายงานพลังที่จะร่ายออกไปด้วย print()',
+      'ไม่มีช่องว่างให้เติมแล้ว — เขียนคาถาเองทั้งหมดตั้งแต่บรรทัดแรก',
+    ],
+    checks: [
+      { label: 'สร้างตัวแปรเอง (เช่น damage = ...)', pattern: HAS_VARIABLE },
+      { label: 'ใช้ค่า atk ในการคำนวณ', pattern: USES_ATK },
+      { label: 'แสดงผลด้วย print()', pattern: CALLS_PRINT },
+    ],
+    hints: [
+      'skill() แรงได้ถึง 3 เท่าของ atk ในการเรียกครั้งเดียว ส่วน attack() ได้สูงสุดเท่ากับ atk',
+      'เรียก attack() / skill() หลายบรรทัดในคาถาเดียวได้ ดาเมจจะสะสมรวมกัน',
+    ],
+  },
+  // บทที่ 3 — คำสั่งเงื่อนไข
+  3: {
+    brief: [
+      'ตรวจสถานการณ์ด้วย if แล้วเลือกพลังโจมตีให้เหมาะสม',
+      'ต้องมีทางเลือกสำรองด้วย else (หรือ elif)',
+      'ใช้ค่า monster_hp ของบอสในเงื่อนไข — เขียนเองทั้งหมด',
+    ],
+    checks: [
+      { label: 'มีเงื่อนไข if ... :', pattern: HAS_IF },
+      { label: 'มีทางเลือกสำรอง else / elif', pattern: HAS_ELSE },
+      { label: 'ตรวจค่า monster_hp ในเงื่อนไข', pattern: USES_MONSTER_HP },
+    ],
+    hints: [
+      'monster_hp คือเลือดที่บอสเหลืออยู่ตอนเริ่มร่าย ใช้เทียบกับตัวเลขได้เลย เช่น if monster_hp > 50:',
+      'อย่าลืม : ท้ายบรรทัดเงื่อนไข และเยื้อง 4 ช่องให้บรรทัดข้างในตรงกัน',
+    ],
+  },
+  // บทที่ 4 — การวนซ้ำ
+  4: {
+    brief: [
+      'ใช้ลูป for หรือ while สั่งให้คาถาทำงานซ้ำ',
+      'เรียกคาถาอยู่ "ข้างใน" ลูป (ต้องเยื้องบรรทัด)',
+      'ดาเมจสะสมจากทุกรอบคือสิ่งที่จะล้มบอสตัวนี้ — เขียนเองทั้งหมด',
+    ],
+    checks: [
+      { label: 'มีลูป for ... : หรือ while ... :', pattern: /^[ \t]*(for\s+\w+\s+in\s+.+:|while\s+.+:)/m },
+      { label: 'เรียกคาถาอยู่ข้างในลูป (บรรทัดเยื้อง)', pattern: /^[ \t]+(attack|skill)\s*\(/m },
+    ],
+    hints: [
+      'for i in range(4): แล้วเยื้องบรรทัดถัดไปเรียก attack(atk) จะได้ดาเมจ 4 เท่าของ atk',
+      'ระวัง while ที่เงื่อนไขไม่มีวันเป็นเท็จ — ข้าตัดคาถาทิ้งเมื่อเรียกเกิน 200 ครั้งในคาถาเดียว',
+    ],
+  },
+  // บทที่ 5 — ฟังก์ชัน
+  5: {
+    brief: [
+      'สร้างฟังก์ชันคาถาของเจ้าเองด้วย def',
+      'ให้ฟังก์ชันส่งค่าพลังกลับมาด้วย return',
+      'ส่งผลลัพธ์ของฟังก์ชันเข้าคาถาโดยตรง เช่น attack(fireball(atk))',
+    ],
+    checks: [
+      { label: 'ประกาศฟังก์ชันด้วย def ชื่อ(...):', pattern: HAS_DEF },
+      { label: 'ส่งค่ากลับด้วย return', pattern: HAS_RETURN },
+      { label: 'ส่งผลลัพธ์ฟังก์ชันเข้า attack()/skill()', pattern: /\b(attack|skill)\s*\(\s*\w+\s*\(/ },
+    ],
+    hints: [
+      'def fireball(power): แล้วบรรทัดถัดไปเยื้อง 4 ช่อง return power * 2',
+      'เรียกใช้แบบ attack(fireball(atk)) — ผลลัพธ์จาก return จะไหลเข้าคาถาทันที',
+    ],
+  },
+  // บทที่ 6 — การจัดการไฟล์
+  6: {
+    brief: [
+      'จารึกพลังคาถาลงไฟล์ด้วย with open(...) as f:',
+      'เขียนด้วย f.write(...) แล้วเปิดอ่านกลับมาด้วย f.read()',
+      'ใช้ค่าที่อ่านกลับมาร่ายใส่บอส — เขียนเองทั้งหมด',
+    ],
+    checks: [
+      { label: 'เปิดไฟล์ด้วย with open(...) as f:', pattern: OPENS_FILE },
+      { label: 'จารึกลงไฟล์ด้วย .write(...)', pattern: WRITES_FILE },
+      { label: 'อ่านกลับมาด้วย .read()', pattern: READS_FILE },
+    ],
+    hints: [
+      'f.write() รับได้เฉพาะข้อความ — แปลงตัวเลขก่อนด้วย str(atk)',
+      'ตอนอ่านกลับมาต้องแปลงกลับเป็นตัวเลขด้วย int(f.read()) ไม่งั้นจะเจอ TypeError',
+    ],
+  },
+  // บทที่ 7 — การจัดการข้อผิดพลาด
+  7: {
+    brief: [
+      'ใช้ monster_armor ของบอสในการคำนวณ (มันถูกสาปให้เป็น 0)',
+      'ครอบด้วย try: แล้วดักคำสาปด้วย except',
+      'ต้องร่ายผ่านโดยไม่มี error หลุดออกมา — เขียนเองทั้งหมด',
+    ],
+    checks: [
+      { label: 'เริ่มด้วย try:', pattern: HAS_TRY },
+      { label: 'ดักข้อผิดพลาดด้วย except', pattern: HAS_EXCEPT },
+      { label: 'ใช้ค่า monster_armor ในการคำนวณ', pattern: USES_MONSTER_ARMOR },
+    ],
+    hints: [
+      'except ZeroDivisionError: แล้วในนั้นตั้งค่าพลังสำรองไว้ เช่น damage = atk * 3',
+      'เรียก attack()/skill() หลังบล็อก try/except จบแล้วก็ได้ ขอแค่ตัวแปรพลังถูกกำหนดค่าทุกเส้นทาง',
+    ],
+  },
+}
+
+// The brief above, turned into the โจทย์ for one of the two boxes. The
+// chapter's demands are identical in both; what differs is which spell has to
+// carry them, so neither box can be left empty while the other does the work.
+export function bossTrial(lesson: LessonData, kind: 'attack' | 'skill'): TrialSpec | null {
+  const spec = BOSS_BRIEFS[lesson.chapter]
+  if (!spec) return null
+  const spell = kind === 'attack' ? 'attack' : 'skill'
+  return {
+    id: `boss-ch${lesson.chapter}-${kind}`,
+    title: kind === 'attack' ? 'คาถาปิดผนึกบอส — โจมตี' : 'คาถาปิดผนึกบอส — สกิลพิเศษ',
+    brief: [...spec.brief, `ปิดท้ายด้วยการร่าย ${spell}(...) ในกล่องนี้`],
+    checks: [
+      ...spec.checks,
+      {
+        label: `ร่ายด้วย ${spell}(...)`,
+        pattern: kind === 'attack' ? CALLS_ATTACK : CALLS_SKILL,
+      },
+    ],
+    hints: spec.hints,
+  }
+}
+
+// What one code box should start out holding. `trial` is null only for an
+// ordinary monster in easy mode, which is what tells the UI to render a plain
 // fill-in-the-blank box with no brief and no pre-cast gate.
 export type SpellTask = {
   code: string
@@ -637,8 +782,17 @@ export function pickSpellTask(
   difficulty: Difficulty,
   kind: 'attack' | 'skill',
   seed: string,
+  // The level's boss gets the chapter's from-scratch โจทย์ in either
+  // difficulty — see BOSS_BRIEFS.
+  isBoss = false,
 ): SpellTask {
   const skeletons = kind === 'attack' ? lesson.attackSkeletons : lesson.skillSkeletons
+
+  if (isBoss) {
+    const trial = bossTrial(lesson, kind)
+    if (trial) return { code: trialStarterCode(trial), trial }
+  }
+
   if (difficulty !== 'hard') return { code: pickVariant(skeletons, seed), trial: null }
 
   const set = trialsForLesson(lesson)

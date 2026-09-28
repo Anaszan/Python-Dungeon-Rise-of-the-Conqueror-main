@@ -41,7 +41,7 @@ export function CombatTicker() {
 
     // Nothing swings while the game is paused, or once the run is over
     // (the game-over and victory screens).
-    if (state.paused || state.phase !== 'exploring') {
+    if (state.paused || state.bossReveal || state.phase !== 'exploring') {
       if (timers.current.size > 0) {
         timers.current.clear()
         publishedKey.current = ''

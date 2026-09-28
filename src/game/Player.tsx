@@ -47,7 +47,9 @@ export function Player({
 
   useFrame((_, delta) => {
     const state = useGameStore.getState()
-    const active = state.phase === 'exploring' && !state.paused
+    // A boss entrance freezes the player the same way a pause does: the
+    // cutscene is something to watch, not to walk out of.
+    const active = state.phase === 'exploring' && !state.paused && !state.bossReveal
 
     const m = move.current
     dir.current.set(

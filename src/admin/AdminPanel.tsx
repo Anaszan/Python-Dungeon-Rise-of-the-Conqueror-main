@@ -32,6 +32,7 @@ export function AdminPanel() {
   const defeatedIds = useGameStore((s) => s.defeatedIds)
   const playerHp = useGameStore((s) => s.playerHp)
   const warpToLevel = useGameStore((s) => s.warpToLevel)
+  const resetLevelMonsters = useGameStore((s) => s.resetLevelMonsters)
 
   const [players, setPlayers] = useState<AdminPlayerRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -82,34 +83,48 @@ export function AdminPanel() {
           <h2 className="admin-section-title">วาร์ปข้ามด่าน</h2>
           <p className="admin-section-note">
             ย้ายตัวละครของบัญชีนี้ไปเริ่มต้นด่านไหนก็ได้ทันที — HP, พลังโจมตี, มอนสเตอร์ที่ปราบแล้วและไอเทมที่เก็บแล้วติดตัวไปด้วยทั้งหมด
-            ไม่มีอะไรถูกล้าง ถ้าด่านปลายทางถูกเคลียร์หมดแล้วจะพาไปที่บทสอบจบด่านนั้นแทน (เพราะไม่เหลือมอนสเตอร์ให้สู้)
+            ไม่มีอะไรถูกล้าง ส่วนปุ่ม "รีเซ็ตมอนสเตอร์" จะปลุกมอนสเตอร์ทั้งด่านนั้นกลับมา (บอสกลับไปถูกผนึกเหมือนเดิม) เพื่อเล่นซ้ำได้
+            — มีผลเฉพาะเซฟของบัญชีนี้เท่านั้น และไอเทมที่เก็บไปแล้วไม่คืนให้ กันการฟาร์มพลัง
           </p>
           {playerHp <= 0 && <p className="admin-error">ตัวละครหมดพลังชีวิตอยู่ — กด "เริ่มใหม่" ที่หน้าเกมโอเวอร์ก่อนจึงจะวาร์ปได้</p>}
           <div className="admin-warp-grid">
             {LEVELS.map((level) => {
               const lesson = LESSONS[level.level - 1]
-              const cleared = level.monsters.every((m) => defeatedIds.has(m.id))
+              const alive = level.monsters.filter((m) => !defeatedIds.has(m.id)).length
               const isCurrent = level.level === currentLevel
               return (
-                <button
+                <div
                   key={level.level}
-                  type="button"
-                  className={`admin-warp-btn${isCurrent ? ' admin-warp-btn-current' : ''}`}
-                  disabled={isCurrent || playerHp <= 0}
-                  onClick={() => {
-                    warpToLevel(level.level)
-                    setPanelOpen(false)
-                  }}
+                  className={`admin-warp-card${isCurrent ? ' admin-warp-btn-current' : ''}`}
                 >
-                  <span className="admin-warp-level">ด่าน {level.level}</span>
-                  <span className="admin-warp-name">{level.name}</span>
-                  <span className="admin-warp-meta">
-                    บทที่ {lesson.chapter} · {lesson.chapterTitle}
-                  </span>
-                  <span className="admin-warp-status">
-                    {isCurrent ? '● อยู่ที่นี่' : cleared ? '✔ เคลียร์แล้ว → ไปบทสอบ' : `มอนสเตอร์ ${level.monsters.length} ตัว`}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className="admin-warp-btn"
+                    disabled={isCurrent || playerHp <= 0}
+                    onClick={() => {
+                      warpToLevel(level.level)
+                      setPanelOpen(false)
+                    }}
+                  >
+                    <span className="admin-warp-level">ด่าน {level.level}</span>
+                    <span className="admin-warp-name">{level.name}</span>
+                    <span className="admin-warp-meta">
+                      บทที่ {lesson.chapter} · {lesson.chapterTitle}
+                    </span>
+                    <span className="admin-warp-status">
+                      {isCurrent ? '● อยู่ที่นี่' : alive === 0 ? '✔ เคลียร์แล้ว (ห้องว่าง)' : `เหลือมอนสเตอร์ ${alive} ตัว`}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-reset-btn"
+                    disabled={alive === level.monsters.length}
+                    onClick={() => resetLevelMonsters(level.level)}
+                    title={`ปลุกมอนสเตอร์ทั้ง ${level.monsters.length} ตัวของด่าน ${level.level} กลับมา`}
+                  >
+                    ♻ รีเซ็ตมอนสเตอร์ ({level.monsters.length - alive} ตัวที่ตายแล้ว)
+                  </button>
+                </div>
               )
             })}
           </div>

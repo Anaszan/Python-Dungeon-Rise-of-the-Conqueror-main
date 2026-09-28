@@ -15,6 +15,7 @@ import { PlayerProfile } from './screens/PlayerProfile'
 import { PlayerHUD } from './screens/PlayerHUD'
 import { TouchJoystick } from './game/TouchJoystick'
 import { LevelBanner } from './screens/LevelBanner'
+import { BossIntro } from './screens/BossIntro'
 import { GameOverOverlay } from './screens/GameOverOverlay'
 import { VictoryOverlay } from './screens/VictoryOverlay'
 import { PauseButton } from './screens/PauseButton'
@@ -167,6 +168,7 @@ function App() {
         <PlayerHUD />
         <TouchJoystick />
         <LevelBanner />
+        <BossIntro />
         <GameOverOverlay />
         <VictoryOverlay />
         {/* Always up now. Fights do not hide them — combat happens in the

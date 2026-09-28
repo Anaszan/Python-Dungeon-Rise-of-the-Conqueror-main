@@ -188,6 +188,7 @@ export function TargetPanel() {
               <span className="target-badge">ATK ของเจ้า {attackPower}</span>
               <span className="target-badge">เกราะ {monster.armor ?? '—'}</span>
               <span className="target-badge">{difficultyLabel(difficulty)}</span>
+              {monster.boss && <span className="target-badge target-badge-boss">บอส · เขียนคาถาเองทั้งหมด</span>}
             </span>
           </div>
           <div className="target-panel-actions">
@@ -237,6 +238,7 @@ export function TargetPanel() {
               compact
               lesson={lesson}
               difficulty={difficulty}
+              isBoss={monster.boss === true}
               monsterId={targetId}
               monsterHp={hp}
               monsterName={monster.name}

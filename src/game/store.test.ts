@@ -336,6 +336,100 @@ describe('useGameStore', () => {
     })
   })
 
+  // The boss's entrance. It freezes the dungeon (Player/CombatTicker both
+  // treat it as a pause), so firing it twice — or never clearing it — would
+  // leave the game standing still.
+  describe('the boss entrance', () => {
+    it('plays once, on the blow that clears the floor', () => {
+      const level = LEVELS[0]
+      const minions = level.monsters.filter((m) => !m.boss)
+      useGameStore.setState({
+        currentLevel: 1,
+        playerHp: 100,
+        defeatedIds: new Set(minions.slice(0, -1).map((m) => m.id)),
+      })
+      expect(useGameStore.getState().bossReveal, 'too early').toBeNull()
+
+      const last = minions[minions.length - 1]
+      useGameStore.getState().setTarget(last.id)
+      useGameStore.getState().damageMonster(last.maxHp)
+
+      expect(useGameStore.getState().bossReveal).toBe(level.monsters.find((m) => m.boss)!.id)
+    })
+
+    it('does not replay when the boss itself is hit', () => {
+      const boss = clearMinionsOf(0)
+      useGameStore.getState().endBossReveal()
+
+      useGameStore.getState().setTarget(boss.id)
+      useGameStore.getState().damageMonster(1)
+
+      expect(useGameStore.getState().bossReveal).toBeNull()
+    })
+
+    it('is cleared by skipping it', () => {
+      clearMinionsOf(0)
+      useGameStore.setState({ bossReveal: 'dragon-1' })
+
+      useGameStore.getState().endBossReveal()
+
+      expect(useGameStore.getState().bossReveal).toBeNull()
+    })
+  })
+
+  // Admin-only, and only ever on this account's own save.
+  describe('resetLevelMonsters', () => {
+    it('stands one level back up without touching the others', () => {
+      const level1 = LEVELS[0].monsters.map((m) => m.id)
+      const level2First = LEVELS[1].monsters[0].id
+      useGameStore.setState({
+        currentLevel: 2,
+        playerHp: 100,
+        defeatedIds: new Set([...level1, level2First]),
+        monsterHp: { 'slime-1': 0, [level2First]: 0 },
+      })
+
+      useGameStore.getState().resetLevelMonsters(1)
+
+      const s = useGameStore.getState()
+      for (const id of level1) expect(s.defeatedIds.has(id), `${id} still dead`).toBe(false)
+      expect(s.monsterHp['slime-1'], 'stale HP left behind').toBeUndefined()
+      expect(s.defeatedIds.has(level2First), 'reset the wrong level').toBe(true)
+    })
+
+    it('puts the boss back behind its seal, and lets go of it', () => {
+      const boss = clearMinionsOf(0)
+      useGameStore.getState().setTarget(boss.id)
+      expect(useGameStore.getState().targetId).toBe(boss.id)
+
+      useGameStore.getState().resetLevelMonsters(1)
+
+      expect(useGameStore.getState().targetId, 'still locked onto a sealed boss').toBeNull()
+      // And the seal really is back: the boss cannot be re-targeted.
+      useGameStore.getState().setTarget(boss.id)
+      expect(useGameStore.getState().targetId).toBeNull()
+    })
+
+    it('keeps the pickups collected, so replaying a level is not a power farm', () => {
+      useGameStore.setState({
+        currentLevel: 1,
+        playerHp: 100,
+        defeatedIds: new Set(['slime-1']),
+        collectedPickupIds: new Set(['heal-1']),
+      })
+
+      useGameStore.getState().resetLevelMonsters(1)
+
+      expect(useGameStore.getState().collectedPickupIds.has('heal-1')).toBe(true)
+    })
+
+    it('clamps the level number like every other admin jump', () => {
+      useGameStore.setState({ defeatedIds: new Set(['slime-1']) })
+      useGameStore.getState().resetLevelMonsters(-2) // → level 1
+      expect(useGameStore.getState().defeatedIds.has('slime-1')).toBe(false)
+    })
+  })
+
   describe('warpToLevel', () => {
     it('jumps to any level without disturbing progress', () => {
       useGameStore.setState({ currentLevel: 1, playerHp: 100, defeatedIds: new Set(['slime-1']), phase: 'exploring' })

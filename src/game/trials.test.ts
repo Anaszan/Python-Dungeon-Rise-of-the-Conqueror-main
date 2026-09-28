@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { LESSONS } from './lessons'
 import {
   ALL_TRIAL_SETS,
+  bossTrial,
   missingCheck,
   pickSpellTask,
   stripComments,
@@ -250,5 +251,80 @@ describe('hard mode trials', () => {
   it('strips comments before checking, including trailing ones', () => {
     expect(stripComments('attack(atk)  # print()')).toBe('attack(atk)  ')
     expect(stripComments('# attack(atk)\ndamage = atk')).toBe('\ndamage = atk')
+  })
+})
+
+// The boss fight is the old sealed door: the chapter written from scratch, in
+// either difficulty. These are the answers that prove each chapter's demands
+// can actually be met — a mistyped check here would wall a player out of the
+// only fight that ends their level.
+const BOSS_ANSWERS: Record<number, string> = {
+  2: `damage = atk
+print(damage)
+`,
+  3: `if monster_hp > 50:
+    damage = atk
+else:
+    damage = atk // 2
+`,
+  4: `for i in range(4):
+    attack(atk)
+`,
+  5: `def fireball(power):
+    return power * 2
+
+attack(fireball(atk))
+`,
+  6: `with open("boss.txt", "w") as f:
+    f.write(str(atk))
+
+with open("boss.txt", "r") as f:
+    damage = int(f.read())
+`,
+  7: `try:
+    damage = atk // monster_armor
+except ZeroDivisionError:
+    damage = atk * 3
+`,
+}
+
+describe('the boss fight', () => {
+  it.each(LESSONS)('chapter $chapter asks for the whole chapter, in either difficulty', (lesson) => {
+    for (const difficulty of ['easy', 'hard'] as const) {
+      for (const kind of ['attack', 'skill'] as const) {
+        const task = pickSpellTask(lesson, difficulty, kind, 'boss', true)
+        expect(task.trial, `${difficulty}/${kind}`).not.toBeNull()
+        // No skeleton to edit — an empty editor under a written brief.
+        expect(task.code, `${difficulty}/${kind}`).not.toContain('___')
+        expect(missingCheck(task.trial!, task.code), 'starter code passes its own โจทย์').toBeDefined()
+        expect(task.trial!.hints.length, 'a boss with no hints').toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it.each(LESSONS)('chapter $chapter accepts a real answer, per box', (lesson) => {
+    const answer = BOSS_ANSWERS[lesson.chapter]
+    expect(answer, `no boss answer for chapter ${lesson.chapter}`).toBeDefined()
+
+    // Each box demands its own spell on top of the chapter's requirements,
+    // so neither can be left empty while the other does the work.
+    const attack = bossTrial(lesson, 'attack')!
+    const skill = bossTrial(lesson, 'skill')!
+    expect(missingCheck(attack, `${answer}attack(damage)`)?.label).toBeUndefined()
+    expect(missingCheck(skill, `${answer}skill(damage)`)?.label).toBeUndefined()
+    // ...and a spell cast in the other box does not satisfy this one: the
+    // skill box still wants skill(), however finished the attack looks.
+    // (Only asserted in this direction: chapters 4 and 5 have to call a spell
+    // inside their loop/function to meet the chapter at all, so their answers
+    // already carry an attack() of their own.)
+    expect(missingCheck(skill, `${answer}attack(damage)`)).toBeDefined()
+  })
+
+  it('leaves ordinary monsters alone', () => {
+    // Easy mode is still easy everywhere else: only the boss loses the
+    // fill-in-the-blank skeleton.
+    const lesson = LESSONS[0]
+    expect(pickSpellTask(lesson, 'easy', 'attack', 'slime-1').trial).toBeNull()
+    expect(pickSpellTask(lesson, 'easy', 'attack', 'dragon-1', true).trial).not.toBeNull()
   })
 })

@@ -8,6 +8,9 @@ import type { Difficulty } from './difficulty'
 type SpellConsoleProps = {
   lesson: LessonData
   difficulty: Difficulty
+  // The level's boss: both boxes then ask for the chapter written from
+  // scratch, in either difficulty (see bossTrial in trials.ts).
+  isBoss?: boolean
   monsterId: string
   monsterHp: number
   monsterName: string
@@ -66,6 +69,7 @@ function freshBox(code: string): BoxState {
 export function SpellConsole({
   lesson,
   difficulty,
+  isBoss = false,
   monsterId,
   monsterHp,
   monsterName,
@@ -87,12 +91,12 @@ export function SpellConsole({
   // through the variants (easy: "fill a number" vs "fill a variable"; hard:
   // one โจทย์ per monster) instead of always showing the same one.
   const attackTask = useMemo(
-    () => pickSpellTask(lesson, difficulty, 'attack', `${monsterId}:atk`),
-    [lesson, difficulty, monsterId],
+    () => pickSpellTask(lesson, difficulty, 'attack', `${monsterId}:atk`, isBoss),
+    [lesson, difficulty, monsterId, isBoss],
   )
   const skillTask = useMemo(
-    () => pickSpellTask(lesson, difficulty, 'skill', `${monsterId}:skill`),
-    [lesson, difficulty, monsterId],
+    () => pickSpellTask(lesson, difficulty, 'skill', `${monsterId}:skill`, isBoss),
+    [lesson, difficulty, monsterId, isBoss],
   )
 
   const [attackBox, setAttackBox] = useState<BoxState>(() => freshBox(attackTask.code))
