@@ -562,12 +562,18 @@ export function Ground({
   theme,
   floorTextureUrl,
   wallTextureUrl,
+  onFloorClick,
 }: {
   regions: Region[]
   walls: Wall[]
   theme: LevelTheme
   floorTextureUrl?: string
   wallTextureUrl?: string
+  // Click-to-walk (see clickMove.ts). The floor slabs are the only thing in
+  // the dungeon the player can click *through* to a place rather than at a
+  // thing, so this lives here. Monsters stop the event before it reaches the
+  // floor, which is what keeps "attack that" from also meaning "walk there".
+  onFloorClick?: (x: number, z: number) => void
 }) {
   return (
     <group>
@@ -583,7 +589,21 @@ export function Ground({
         // reached. The procedural stone texture already carves its own slab
         // grout lines, so nothing was lost by dropping it.
         return (
-          <mesh key={i} receiveShadow position={[x, 0, z]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh
+            key={i}
+            receiveShadow
+            position={[x, 0, z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            onPointerDown={
+              onFloorClick &&
+              ((e) => {
+                // Only the nearest floor hit: a click crossing two slabs at a
+                // shared edge would otherwise fire twice.
+                e.stopPropagation()
+                onFloorClick(e.point.x, e.point.z)
+              })
+            }
+          >
             <planeGeometry args={[width, depth]} />
             {floorTextureUrl ? (
               <Suspense fallback={<ThemedFloorMaterial theme={theme} width={width} depth={depth} />}>

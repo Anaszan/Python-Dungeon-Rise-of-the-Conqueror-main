@@ -6,6 +6,12 @@ export type MonsterData = {
   attackDamage: number
   attackInterval: number
   position: [number, number, number]
+  // The level's boss — the fight that ends it. Exactly one per level
+  // (levels.test.ts), and sealed away until every other monster on the floor
+  // is dead: it is not drawn, cannot be targeted and cannot swing before then
+  // (see bossIsSealed / availableMonsters in levels.ts). Killing it is what
+  // opens the next level, which is the job the end-of-level exam used to do.
+  boss?: boolean
   // Art: drop a (transparent-background) image under public/monsters and
   // point this at its URL (e.g. "/monsters/slime.png") to render the monster
   // as a billboarded sprite instead of the placeholder shape. Still required

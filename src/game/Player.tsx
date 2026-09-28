@@ -11,6 +11,7 @@ import {
   PLAYER_SPEED,
 } from './constants'
 import { canStandAt, hitsWall, isWalkable, type Region, type Wall } from './dungeon'
+import { cancelClickMove, clickMoveDirection } from './clickMove'
 import { useGameStore } from './store'
 import { DEFAULT_CHARACTER_CLASS } from '../character/characterOptions'
 import { CharacterModel } from '../character/CharacterModel'
@@ -54,6 +55,19 @@ export function Player({
       0,
       (m.backward ? 1 : 0) - (m.forward ? 1 : 0) + touchMoveState.z,
     )
+
+    // Steering by hand always wins: the first key (or joystick nudge) drops
+    // whatever the last click was walking toward, so the two never fight over
+    // the same body.
+    if (dir.current.lengthSq() > 0.0001) {
+      cancelClickMove()
+    } else {
+      const toClick = clickMoveDirection(positionRef.current.x, positionRef.current.z)
+      // Null means the walk is over — either nothing was clicked, or the
+      // destination has been reached and this is the step that stops.
+      if (toClick) dir.current.set(toClick.x, 0, toClick.z)
+      else cancelClickMove()
+    }
     // Held keys during a fight or a pause must not leave the model marching in
     // place, so this asks whether the player is walking, not merely steering.
     const moving = active && dir.current.lengthSq() > 0.0001
@@ -81,8 +95,17 @@ export function Player({
 
       // Axis at a time, so running into a wall diagonally slides along it
       // instead of stopping dead.
-      if (allowed(nextX, pos.z)) pos.x = nextX
-      if (allowed(pos.x, nextZ)) pos.z = nextZ
+      const steppedX = allowed(nextX, pos.z)
+      if (steppedX) pos.x = nextX
+      const steppedZ = allowed(pos.x, nextZ)
+      if (steppedZ) pos.z = nextZ
+
+      // A click-walk that cannot move on either axis is wedged against
+      // something between it and the destination (the dungeon has corners a
+      // straight line does not solve). Give up rather than grinding into the
+      // wall forever — sliding along one is unaffected, since that still
+      // moves on one axis.
+      if (!steppedX && !steppedZ) cancelClickMove()
 
       facing.current = Math.atan2(dir.current.x, dir.current.z)
     }

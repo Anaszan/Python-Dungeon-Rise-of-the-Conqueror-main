@@ -10,9 +10,8 @@
 //          written brief, and a checklist of the chapter's syntax that the
 //          code has to actually contain before the spell is allowed to fire.
 //
-// The end-of-level exam (LevelExamOverlay) is deliberately the same in both
-// modes — it was already a write-it-from-scratch test. Hard mode is what makes
-// every ordinary monster on the way to it feel like one too.
+// Both modes fight the same monsters, the same level bosses included: the
+// difficulty is in what the code boxes ask for, never in anyone's HP.
 export type Difficulty = 'easy' | 'hard'
 
 // What a save written before migrations_011 (or a player who somehow reaches
@@ -40,7 +39,7 @@ export const DIFFICULTY_OPTIONS: DifficultyOption[] = [
     bullets: [
       'ทุกครั้งที่เจอมอนสเตอร์ จะมีโค้ดตั้งต้นให้พร้อม เหลือแค่ช่อง ___ ให้เติม',
       'เหมาะกับคนที่เพิ่งเริ่มเขียน Python หรืออยากดูโครงคาถาที่ถูกต้องก่อน',
-      'ยังต้องผ่านบทสอบจบด่านที่ต้องเขียนเองทั้งหมดเหมือนกัน',
+      'ยังต้องล้มบอสประจำด่านเองเหมือนกัน — บอสใช้โจทย์แบบเดียวกับมอนสเตอร์ตัวอื่นในด่าน',
     ],
     sample: `damage = ___  # TODO: ใส่ตัวแปรพลังโจมตี
 

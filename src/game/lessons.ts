@@ -1,36 +1,15 @@
 // One line of the "does this code actually use the chapter" checklist shown
-// beside the level-exam editor. `pattern` is tested against the player's raw
-// source, not the run's output, because the whole point of the exam is that
-// the code was written using this chapter's syntax — passing by pasting three
-// bare attack() calls into the loops exam should not count.
+// beside a hard-mode โจทย์ (trials.ts). `pattern` is tested against the
+// player's source, not the run's output, because the whole point is that the
+// code was written using this chapter's syntax — pasting three bare attack()
+// calls into the loops level should not count.
 //
 // Deliberately never global (`/g`): a global RegExp carries lastIndex between
 // .test() calls, so the same literal would flip between true and false as the
 // checklist re-renders on every keystroke.
-export type ExamCheck = {
+export type CodeCheck = {
   label: string
   pattern: RegExp
-}
-
-// The end-of-level exam: once every monster in a level is dead the player
-// does not walk straight into the next level — they get one empty editor and
-// have to write that chapter's whole spell from scratch (no `___` skeleton to
-// fill in, no half-written code carried over) and bring the gate guardian
-// down with it. See LevelExamOverlay.tsx and store.exitCombat/passLevelExam.
-export type ExamSpec = {
-  guardianName: string
-  // Reset to full at the start of every run, so passing means one complete
-  // script did the whole job — not damage dribbled in across ten attempts.
-  guardianHp: number
-  // What Python sees as `monster_armor`. Level 6's guardian is 0 for the same
-  // reason its monsters are: naive division has to blow up so try/except is
-  // the only way through.
-  guardianArmor: number
-  brief: string[]
-  // Header comment only. Everything below it is the player's to write.
-  starterCode: string
-  checks: ExamCheck[]
-  hints: string[]
 }
 
 export type LessonData = {
@@ -57,7 +36,6 @@ export type LessonData = {
   // Hard mode ignores these entirely and uses trials.ts instead.
   attackSkeletons: string[]
   skillSkeletons: string[]
-  exam: ExamSpec
 }
 
 // Deterministic pick, not Math.random(): the same monster always shows the
@@ -132,29 +110,6 @@ power = ___  # TODO: เติมตัวเลขพลังของสก�
 skill(power)
 `,
     ],
-    exam: {
-      guardianName: 'ผู้พิทักษ์ประตูด่าน 1',
-      guardianHp: 60,
-      guardianArmor: 5,
-      brief: [
-        'สร้างตัวแปรของเจ้าเองเพื่อเก็บพลังโจมตี โดยคำนวณจาก atk',
-        'รายงานพลังที่จะร่ายออกไปด้วย print()',
-        'ร่าย attack(...) หรือ skill(...) ให้รวมกันแล้วล้มผู้พิทักษ์ได้ในการร่ายครั้งเดียว',
-      ],
-      starterCode: `# บทสอบจบด่าน 1 — บทที่ 2: ตัวแปรและชนิดข้อมูล
-# เขียนคาถาปิดผนึกด่านนี้เองทั้งหมด (ไม่มีช่องว่างให้เติมแล้ว)
-
-`,
-      checks: [
-        { label: 'สร้างตัวแปรเอง (เช่น damage = ...)', pattern: /^[ \t]*[A-Za-z_]\w*\s*=[^=]/m },
-        { label: 'ใช้ค่า atk ในการคำนวณ', pattern: /\batk\b/ },
-        { label: 'แสดงผลด้วย print()', pattern: /\bprint\s*\(/ },
-      ],
-      hints: [
-        'skill() แรงได้ถึง 3 เท่าของ atk ในการเรียกครั้งเดียว ส่วน attack() ได้สูงสุดเท่ากับ atk',
-        'เรียก attack() / skill() หลายบรรทัดในคาถาเดียวได้ ดาเมจจะสะสมรวมกัน',
-      ],
-    },
   },
 
   // Level 2 — บทที่ 3: คำสั่งเงื่อนไข
@@ -198,29 +153,6 @@ else:
 skill(power)
 `,
     ],
-    exam: {
-      guardianName: 'ผู้พิทักษ์ประตูด่าน 2',
-      guardianHp: 90,
-      guardianArmor: 5,
-      brief: [
-        'ตรวจสถานการณ์ด้วย if แล้วเลือกพลังโจมตีให้เหมาะสม',
-        'ต้องมีทางเลือกสำรองด้วย else (หรือ elif)',
-        'ใช้ค่า monster_hp ของผู้พิทักษ์ในเงื่อนไข แล้วล้มมันในการร่ายครั้งเดียว',
-      ],
-      starterCode: `# บทสอบจบด่าน 2 — บทที่ 3: คำสั่งเงื่อนไข
-# เขียนคาถาปิดผนึกด่านนี้เองทั้งหมด (ไม่มีช่องว่างให้เติมแล้ว)
-
-`,
-      checks: [
-        { label: 'มีเงื่อนไข if ... :', pattern: /^[ \t]*if\s+.+:/m },
-        { label: 'มีทางเลือกสำรอง else / elif', pattern: /^[ \t]*(elif\s+.+:|else\s*:)/m },
-        { label: 'ตรวจค่า monster_hp ในเงื่อนไข', pattern: /\bmonster_hp\b/ },
-      ],
-      hints: [
-        'monster_hp คือเลือดเต็มของผู้พิทักษ์ตอนเริ่มร่าย ใช้เทียบกับตัวเลขได้เลย เช่น if monster_hp > 50:',
-        'อย่าลืม : ท้ายบรรทัดเงื่อนไข และเยื้อง 4 ช่องให้บรรทัดข้างในตรงกัน',
-      ],
-    },
   },
 
   // Level 3 — บทที่ 4: การวนซ้ำ
@@ -258,28 +190,6 @@ while remaining ___ 20:  # TODO: ใส่เงื่อนไขให้ว�
     remaining = remaining - atk // 2
 `,
     ],
-    exam: {
-      guardianName: 'ผู้พิทักษ์ประตูด่าน 3',
-      guardianHp: 120,
-      guardianArmor: 5,
-      brief: [
-        'ใช้ลูป for หรือ while สั่งให้คาถาทำงานซ้ำ',
-        'เรียก attack(...) หรือ skill(...) อยู่ "ข้างใน" ลูป (ต้องเยื้องบรรทัด)',
-        'ดาเมจรวมจากทุกรอบต้องล้มผู้พิทักษ์ได้ในการร่ายครั้งเดียว',
-      ],
-      starterCode: `# บทสอบจบด่าน 3 — บทที่ 4: การวนซ้ำ
-# เขียนคาถาปิดผนึกด่านนี้เองทั้งหมด (ไม่มีช่องว่างให้เติมแล้ว)
-
-`,
-      checks: [
-        { label: 'มีลูป for ... : หรือ while ... :', pattern: /^[ \t]*(for\s+\w+\s+in\s+.+:|while\s+.+:)/m },
-        { label: 'เรียกคาถาอยู่ข้างในลูป (บรรทัดเยื้อง)', pattern: /^[ \t]+(attack|skill)\s*\(/m },
-      ],
-      hints: [
-        'for i in range(4): แล้วเยื้องบรรทัดถัดไปเรียก attack(atk) จะได้ดาเมจ 4 เท่าของ atk',
-        'ระวัง while ที่เงื่อนไขไม่มีวันเป็นเท็จ — ข้าตัดคาถาทิ้งเมื่อเรียกเกิน 200 ครั้งในคาถาเดียว',
-      ],
-    },
   },
 
   // Level 4 — บทที่ 5: ฟังก์ชัน
@@ -318,29 +228,6 @@ def big_spell(power, bonus=___):  # TODO: ใส่ตัวเลขโบน�
 skill(big_spell(atk))
 `,
     ],
-    exam: {
-      guardianName: 'ผู้พิทักษ์ประตูด่าน 4',
-      guardianHp: 120,
-      guardianArmor: 5,
-      brief: [
-        'สร้างฟังก์ชันคาถาของเจ้าเองด้วย def',
-        'ให้ฟังก์ชันส่งค่าพลังกลับมาด้วย return',
-        'ส่งผลลัพธ์ของฟังก์ชันเข้า attack(...) หรือ skill(...) โดยตรง แล้วล้มผู้พิทักษ์ในการร่ายครั้งเดียว',
-      ],
-      starterCode: `# บทสอบจบด่าน 4 — บทที่ 5: ฟังก์ชัน
-# เขียนคาถาปิดผนึกด่านนี้เองทั้งหมด (ไม่มีช่องว่างให้เติมแล้ว)
-
-`,
-      checks: [
-        { label: 'ประกาศฟังก์ชันด้วย def ชื่อ(...):', pattern: /^[ \t]*def\s+\w+\s*\(.*\)\s*:/m },
-        { label: 'ส่งค่ากลับด้วย return', pattern: /^[ \t]+return\b/m },
-        { label: 'ส่งผลลัพธ์ฟังก์ชันเข้า attack()/skill()', pattern: /\b(attack|skill)\s*\(\s*\w+\s*\(/ },
-      ],
-      hints: [
-        'def fireball(power): แล้วบรรทัดถัดไปเยื้อง 4 ช่อง return power * 2',
-        'เรียกใช้แบบ attack(fireball(atk)) — ผลลัพธ์จาก return จะไหลเข้าคาถาทันที',
-      ],
-    },
   },
 
   // Level 5 — บทที่ 6: การจัดการไฟล์
@@ -390,29 +277,6 @@ with open("skillbook.txt", "r") as f:
 skill(power)
 `,
     ],
-    exam: {
-      guardianName: 'ผู้พิทักษ์ประตูด่าน 5',
-      guardianHp: 90,
-      guardianArmor: 5,
-      brief: [
-        'จารึกพลังคาถาลงไฟล์ด้วย with open(...) as f:',
-        'เขียนด้วย f.write(...) แล้วเปิดอ่านกลับมาด้วย f.read()',
-        'ใช้ค่าที่อ่านกลับมาร่ายคาถาจนล้มผู้พิทักษ์ในการร่ายครั้งเดียว',
-      ],
-      starterCode: `# บทสอบจบด่าน 5 — บทที่ 6: การจัดการไฟล์
-# เขียนคาถาปิดผนึกด่านนี้เองทั้งหมด (ไม่มีช่องว่างให้เติมแล้ว)
-
-`,
-      checks: [
-        { label: 'เปิดไฟล์ด้วย with open(...) as f:', pattern: /\bwith\s+open\s*\(/ },
-        { label: 'จารึกลงไฟล์ด้วย .write(...)', pattern: /\.write\s*\(/ },
-        { label: 'อ่านกลับมาด้วย .read()', pattern: /\.read\s*\(/ },
-      ],
-      hints: [
-        'f.write() รับได้เฉพาะข้อความ — แปลงตัวเลขก่อนด้วย str(atk)',
-        'ตอนอ่านกลับมาต้องแปลงกลับเป็นตัวเลขด้วย int(f.read()) ไม่งั้นจะเจอ TypeError',
-      ],
-    },
   },
 
   // Level 6 — บทที่ 7: การจัดการข้อผิดพลาด
@@ -458,31 +322,5 @@ ___:  # TODO: เติม finally เพื่อให้ทำงานเส
 skill(power)
 `,
     ],
-    exam: {
-      guardianName: 'ผู้พิทักษ์ประตูสุดท้าย',
-      guardianHp: 120,
-      // 0 on purpose, same as every monster in this level — a naive
-      // atk / monster_armor in the exam has to raise ZeroDivisionError so
-      // try/except is the only way past the last gate.
-      guardianArmor: 0,
-      brief: [
-        'ใช้ monster_armor ของผู้พิทักษ์ในการคำนวณ (มันถูกสาปให้เป็น 0)',
-        'ครอบด้วย try: แล้วดักคำสาปด้วย except',
-        'ต้องร่ายผ่านโดยไม่มี error หลุดออกมา และล้มผู้พิทักษ์ในการร่ายครั้งเดียว',
-      ],
-      starterCode: `# บทสอบจบด่าน 6 — บทที่ 7: การจัดการข้อผิดพลาด
-# เขียนคาถาปิดผนึกด่านนี้เองทั้งหมด (ไม่มีช่องว่างให้เติมแล้ว)
-
-`,
-      checks: [
-        { label: 'เริ่มด้วย try:', pattern: /^[ \t]*try\s*:/m },
-        { label: 'ดักข้อผิดพลาดด้วย except', pattern: /^[ \t]*except\b/m },
-        { label: 'ใช้ค่า monster_armor ในการคำนวณ', pattern: /\bmonster_armor\b/ },
-      ],
-      hints: [
-        'except ZeroDivisionError: แล้วในนั้นตั้งค่าพลังสำรองไว้ เช่น damage = atk * 3',
-        'เรียก attack()/skill() หลังบล็อก try/except จบแล้วก็ได้ ขอแค่ตัวแปรพลังถูกกำหนดค่าทุกเส้นทาง',
-      ],
-    },
   },
 ]

@@ -1,4 +1,4 @@
-import type { ExamCheck, LessonData } from './lessons'
+import type { CodeCheck, LessonData } from './lessons'
 import { pickVariant } from './lessons'
 import type { Difficulty } from './difficulty'
 
@@ -6,7 +6,7 @@ import type { Difficulty } from './difficulty'
 //
 // Easy mode hands the player a finished spell with a single `___` in it. A
 // trial hands them an empty editor, a written brief, and `checks` — the same
-// source-scanning idea the end-of-level exam uses (see ExamCheck in
+// source-scanning idea the end-of-level exam uses (see CodeCheck in
 // lessons.ts), except here the checks are enforced *before* the code is
 // allowed to run, so a spell that does not use the chapter's syntax never
 // fires at all. That is the whole difficulty: the monster states a problem and
@@ -24,8 +24,8 @@ export type TrialSpec = {
   // comment header the editor starts with (see trialStarterCode).
   brief: string[]
   // Every one of these must match the player's (comment-stripped) source
-  // before the spell can be cast. Never global — see ExamCheck.
-  checks: ExamCheck[]
+  // before the spell can be cast. Never global — see CodeCheck.
+  checks: CodeCheck[]
   hints: string[]
 }
 
@@ -619,7 +619,7 @@ export function stripComments(code: string): string {
   return code.replace(/#.*$/gm, '')
 }
 
-export function missingCheck(trial: TrialSpec, code: string): ExamCheck | undefined {
+export function missingCheck(trial: TrialSpec, code: string): CodeCheck | undefined {
   const source = stripComments(code)
   return trial.checks.find((c) => !c.pattern.test(source))
 }

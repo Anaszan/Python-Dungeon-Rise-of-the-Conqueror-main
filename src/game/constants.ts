@@ -44,7 +44,7 @@ export const BASE_ATTACK_POWER = 30
 // see levels.ts. Kept as one constant rather than a per-pickup number so the
 // power curve stays flat and predictable: the player's atk is always
 // BASE_ATTACK_POWER + 10 per potion collected, no matter which level it came
-// from. The level-exam damage targets in lessons.ts are sized against that.
+// from. Boss HP in levels.ts is sized against that curve.
 export const ATTACK_PICKUP_AMOUNT = 10
 
 export const SKILL_COOLDOWN_SECONDS = 8

@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from './store'
-import { LEVELS } from './levels'
+import { availableMonsters, LEVELS } from './levels'
 import { playerPosition } from './playerPosition'
 import { isAggroed, isOutOfLockRange, nearestTarget } from './combat'
 import { spawnFloatingHit } from './combatFx'
@@ -39,8 +39,8 @@ export function CombatTicker() {
       if (!state.paused) state.tickCooldowns(delta)
     }
 
-    // Nothing swings while the game is paused, during the end-of-level exam,
-    // or once the player is down.
+    // Nothing swings while the game is paused, or once the run is over
+    // (the game-over and victory screens).
     if (state.paused || state.phase !== 'exploring') {
       if (timers.current.size > 0) {
         timers.current.clear()
@@ -51,14 +51,18 @@ export function CombatTicker() {
     }
 
     const level = LEVELS[state.currentLevel - 1]
+    // A boss still behind its seal is not in the dungeon: it does not swing,
+    // cannot be auto-locked, and is not what the lock drops to. Same list the
+    // scene draws from (see availableMonsters).
+    const present = availableMonsters(level, state.defeatedIds)
     const px = playerPosition.x
     const pz = playerPosition.z
 
     // The lock lets go on its own when the target dies (damageMonster already
     // did that) or when the player has simply walked off and left it.
     if (state.targetId) {
-      const target = level.monsters.find((m) => m.id === state.targetId)
-      if (!target || state.defeatedIds.has(state.targetId) || isOutOfLockRange(target, px, pz)) {
+      const target = present.find((m) => m.id === state.targetId)
+      if (!target || isOutOfLockRange(target, px, pz)) {
         state.setTarget(null)
       }
     }
@@ -68,7 +72,7 @@ export function CombatTicker() {
     let anyEngaged = false
 
     for (const monster of level.monsters) {
-      if (state.defeatedIds.has(monster.id)) {
+      if (!present.includes(monster)) {
         timers.current.delete(monster.id)
         continue
       }
@@ -110,7 +114,7 @@ export function CombatTicker() {
     // standing in a monster's reach would be undone on the very next frame.
     if (anyEngaged) {
       if (!state.targetId && !state.suppressAutoTarget) {
-        const nearest = nearestTarget(level.monsters, state.defeatedIds, px, pz)
+        const nearest = nearestTarget(present, state.defeatedIds, px, pz)
         if (nearest) state.setTarget(nearest.id)
       }
     } else if (state.suppressAutoTarget) {

@@ -45,7 +45,7 @@ export function TouchJoystick() {
   const pointerIdRef = useRef<number | null>(null)
   const [knob, setKnob] = useState({ x: 0, y: 0 })
   // The stick only exists while walking around by thumb: the pause menu (and
-  // the end-of-level exam, and the game-over screen) takes the screen over,
+  // and the game-over screen) takes the screen over,
   // the keyboard replaces it outright, and a drag in progress ends either way.
   // Fights no longer hide it — walking away mid-fight is a move now, and on a
   // phone the stick is the only way to make it.

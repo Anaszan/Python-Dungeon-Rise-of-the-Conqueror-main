@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import type { Mesh } from 'three'
 import { Sparkles } from '@react-three/drei'
 import { Ground } from './Ground'
 import { Player } from './Player'
@@ -10,6 +11,7 @@ import { CombatTicker } from './CombatTicker'
 import { TargetPanel } from './TargetPanel'
 import { FloatingHits } from './FloatingHits'
 import { playerPosition } from './playerPosition'
+import { cancelClickMove, clickMoveTarget, setClickMoveTarget } from './clickMove'
 import { cycleTarget } from './combat'
 import { isTypingTarget } from './useKeyboardMap'
 import {
@@ -32,11 +34,35 @@ import {
 } from './DungeonProps'
 import type { PropProps } from './DungeonProps'
 import type { DecorationKind } from './levels'
-import { LEVELS } from './levels'
+import { availableMonsters, LEVELS } from './levels'
 import { levelColliders } from './propCollision'
 import { useGameStore } from './store'
 import { PICKUP_TRIGGER_DISTANCE, POSITION_SAVE_DISTANCE, POSITION_SAVE_MIN_INTERVAL_SECONDS } from './constants'
 import { canStandAt } from './dungeon'
+
+// The ring left on the floor where the player clicked, for as long as they are
+// still walking to it. Driven straight off the module state every frame rather
+// than through React: the destination changes on a click and clears itself
+// mid-walk (Player.tsx), neither of which is worth a re-render of the scene.
+function ClickMoveMarker() {
+  const ring = useRef<Mesh>(null)
+
+  useFrame((_, delta) => {
+    const mesh = ring.current
+    if (!mesh) return
+    mesh.visible = clickMoveTarget.active
+    if (!mesh.visible) return
+    mesh.position.set(clickMoveTarget.x, 0.03, clickMoveTarget.z)
+    mesh.rotation.z += delta * 1.6
+  })
+
+  return (
+    <mesh ref={ring} visible={false} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.22, 0.32, 24, 1, 0, Math.PI * 1.5]} />
+      <meshBasicMaterial color="#f0c85a" transparent opacity={0.8} depthWrite={false} />
+    </mesh>
+  )
+}
 
 // Every prop takes the same props (see PropProps), so a level's decoration
 // list maps straight through this table — adding a prop kind is a new entry
@@ -66,6 +92,9 @@ export function GameScene() {
   const playerPos = useRef(playerPosition)
   const phase = useGameStore((s) => s.phase)
   const currentLevel = useGameStore((s) => s.currentLevel)
+  // Re-renders the scene when a monster dies, which is exactly when the boss
+  // may need to appear.
+  const defeatedIds = useGameStore((s) => s.defeatedIds)
   const levelData = LEVELS[currentLevel - 1]
   // Walls plus every solid prop (coffins, shelves, statues...) — see
   // propCollision.ts. Memoized per level: Player tests against this list
@@ -122,6 +151,10 @@ export function GameScene() {
     const levelChanged = prevLevel.current !== state.currentLevel
     if (restarted || levelChanged) {
       playerPos.current.set(...LEVELS[state.currentLevel - 1].spawnPosition)
+      // A destination clicked on the old floor means nothing on the new one —
+      // left standing, it would march the player off toward those coordinates
+      // the instant they arrived.
+      cancelClickMove()
       // The distance for the next save is measured from here, not from the
       // spot on the level (or the run) just left behind.
       lastSavedAt.current = { x: playerPos.current.x, z: playerPos.current.z }
@@ -196,7 +229,7 @@ export function GameScene() {
       // dungeon.
       e.preventDefault()
       const next = cycleTarget(
-        LEVELS[state.currentLevel - 1].monsters,
+        availableMonsters(LEVELS[state.currentLevel - 1], state.defeatedIds),
         state.defeatedIds,
         playerPosition.x,
         playerPosition.z,
@@ -250,7 +283,15 @@ export function GameScene() {
         theme={theme}
         floorTextureUrl={levelData.floorTextureUrl}
         wallTextureUrl={levelData.wallTextureUrl}
+        onFloorClick={(x, z) => {
+          // Clicking the floor while dead, paused or mid-victory should not
+          // quietly queue up a walk for whenever the screen clears.
+          const state = useGameStore.getState()
+          if (state.phase !== 'exploring' || state.paused) return
+          setClickMoveTarget(x, z)
+        }}
       />
+      <ClickMoveMarker />
       <Player positionRef={playerPos} regions={levelData.regions} walls={colliders} />
       <CombatTicker />
       {/* Both live inside the canvas because both are anchored to points in
@@ -258,7 +299,11 @@ export function GameScene() {
           and every damage number pops off whatever it was dealt to. */}
       <TargetPanel />
       <FloatingHits />
-      {levelData.monsters.map((monster) => (
+      {/* The level's boss is simply not here until every other monster on the
+          floor is dead — no model, no nameplate, nothing to click. Walking
+          into its corner early finds an empty room, and the moment the last
+          minion drops it appears (see availableMonsters). */}
+      {availableMonsters(levelData, defeatedIds).map((monster) => (
         <Monster key={monster.id} data={monster} />
       ))}
       {levelData.pickups.map((pickup) => (

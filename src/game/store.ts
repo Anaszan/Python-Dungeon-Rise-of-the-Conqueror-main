@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { useAuthStore } from '../auth/authStore'
 import { saveProgress, submitScore, type SavedPosition, type SaveData } from './persistence'
-import { ALL_MONSTERS, LEVELS } from './levels'
+import { ALL_MONSTERS, bossIsSealed, LEVELS } from './levels'
 import { PLAYER_MAX_HP, BASE_ATTACK_POWER, SKILL_COOLDOWN_SECONDS, ATTACK_COOLDOWN_SECONDS } from './constants'
 import {
   DEFAULT_GENDER,
@@ -18,13 +18,11 @@ import type { Difficulty } from './difficulty'
 // in the dungeon and free to walk away mid-fight — so 'exploring' *is* the
 // combat state (see the target lock below).
 //
-// 'exam' sits between clearing a level and getting the next one: the moment
-// the last monster of a level goes down, the player is dropped into the
-// end-of-level exam (LevelExamOverlay) instead of straight into level N+1.
-// Nothing but passLevelExam() leaves this phase, so the exam is the only door
-// out of a finished level — including the last one, which reaches 'victory'
-// through it rather than around it.
-type GamePhase = 'exploring' | 'exam' | 'gameover' | 'victory'
+// There is no phase between two levels any more. The sealed door with its
+// write-the-whole-chapter exam is gone, and the level's boss took its place:
+// clear the floor, the boss appears (see bossIsSealed), kill it and the next
+// level opens on the spot — the last level's boss opening 'victory' instead.
+type GamePhase = 'exploring' | 'gameover' | 'victory'
 
 type GameState = {
   phase: GamePhase
@@ -99,10 +97,9 @@ type GameState = {
   startAttackCooldown: () => void
   tickCooldowns: (delta: number) => void
   setMonsterSwing: (swing: Record<string, number>) => void
-  passLevelExam: () => void
   setPaused: (paused: boolean) => void
   // Admin-only jump to any level (see src/admin/). Not reachable from normal
-  // play — the only way past a level's gate is passLevelExam().
+  // play — the only way onward is killing the level's boss.
   warpToLevel: (level: number) => void
   confirmCharacter: (
     characterClass: CharacterClass,
@@ -205,9 +202,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     // corpse is not a target, and letting it become one would leave the panel
     // open on a monster that is no longer in the dungeon.
     if (!monster) return
-    const { defeatedIds, monsterHp, phase } = get()
+    const { defeatedIds, monsterHp, phase, currentLevel } = get()
     if (defeatedIds.has(monsterId)) return
     if (phase !== 'exploring') return
+    // A boss still behind its seal is not in the dungeon at all — it cannot be
+    // clicked, Tab-cycled or auto-locked onto until the floor is cleared.
+    if (monster.boss && bossIsSealed(LEVELS[currentLevel - 1], defeatedIds)) return
     set({
       targetId: monsterId,
       // Choosing a target is itself the answer to "leave me alone".
@@ -234,7 +234,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextDefeated = new Set(defeatedIds)
     if (nextHp <= 0) nextDefeated.add(targetId)
 
-    const levelCleared = nextHp <= 0 && LEVELS[currentLevel - 1].monsters.every((m) => nextDefeated.has(m.id))
+    // The boss going down is the end of the level — the only way onward now
+    // that the sealed door and its exam are gone. It cannot be reached early:
+    // a sealed boss is not in the dungeon at all, so it can never have been
+    // the target (see availableMonsters / setTarget).
+    const killedBoss = nextHp <= 0 && !wasDefeated && ALL_MONSTERS.find((m) => m.id === targetId)?.boss === true
+    const isLastLevel = currentLevel === LEVELS.length
 
     set({
       monsterHp: { ...monsterHp, [targetId]: nextHp },
@@ -243,17 +248,26 @@ export const useGameStore = create<GameState>((set, get) => ({
       // closes, the corpse disappears, and the player is free to pick the
       // next one. Nothing here waits on a "Continue" button any more.
       targetId: nextHp <= 0 ? null : targetId,
-      // Clearing the last monster of a level is what opens that level's exam.
-      // currentLevel deliberately does not move — passLevelExam() is still the
-      // only thing that advances it, so a reload mid-exam lands back on the
-      // exam (see hydrateSave) rather than skipping it.
-      phase: levelCleared ? 'exam' : get().phase,
+      // Straight into the next level's chapter intro (App.tsx watches
+      // currentLevel), or into the victory screen after the last boss. HP,
+      // attack power and the skill cooldown all carry over, exactly as they
+      // did through the old exam.
+      ...(killedBoss
+        ? isLastLevel
+          ? { phase: 'victory' as const, monsterSwing: {}, suppressAutoTarget: false }
+          : {
+              currentLevel: currentLevel + 1,
+              monsterSwing: {},
+              suppressAutoTarget: false,
+              // The new level starts at its own entrance.
+              lastPosition: null,
+            }
+        : {}),
     })
 
     if (!wasDefeated && nextHp <= 0) {
       persist()
-      const isLastLevel = currentLevel === LEVELS.length
-      if (isLastLevel && levelCleared) {
+      if (isLastLevel && killedBoss) {
         const userId = useAuthStore.getState().session?.user.id
         if (userId) submitScore(userId, nextDefeated.size)
       }
@@ -316,52 +330,25 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setMonsterSwing: (swing) => set({ monsterSwing: swing }),
 
-  // The only exit from 'exam': called by LevelExamOverlay once the player's
-  // own from-scratch code has satisfied every check for the chapter and put
-  // the gate guardian down in a single cast.
-  passLevelExam: () => {
-    const { phase, currentLevel } = get()
-    if (phase !== 'exam') return
-
-    if (currentLevel < LEVELS.length) {
-      set({
-        phase: 'exploring',
-        targetId: null,
-        monsterSwing: {},
-        suppressAutoTarget: false,
-        currentLevel: currentLevel + 1,
-        // A new level starts at its entrance, and a reload before the first
-        // few steps must not hand back a spot from the level just left.
-        lastPosition: null,
-      })
-      persist()
-      return
-    }
-
-    set({ phase: 'victory', targetId: null, monsterSwing: {}, suppressAutoTarget: false })
-  },
-
   setPaused: (paused) => set({ paused }),
 
   // Drops the player at the start of any level, for testing. Nothing else is
   // touched — HP, attack power, defeated monsters and collected pickups all
   // carry over — so warping away and back leaves progress exactly as it was.
   //
-  // The phase is re-derived the same way hydrateSave does it: warping into a
-  // level whose monsters are already dead has to land on that level's exam,
-  // because 'exam' is only ever entered by the killing blow on a level's last
-  // monster (damageMonster) and there are none left to kill. Without this the
-  // admin would arrive in an empty dungeon with no way forward.
+  // Warping into a level whose monsters are all already dead simply lands in
+  // an empty floor: there is no gate left to open there, and its boss is
+  // already gone. That only happens by admin warp — normal play never leaves
+  // a level standing behind it.
   warpToLevel: (level) => {
-    const { playerHp, defeatedIds, currentLevel } = get()
+    const { playerHp, currentLevel } = get()
     if (playerHp <= 0) return // dead — the game-over overlay owns the screen
     const target = Math.min(Math.max(Math.round(level), 1), LEVELS.length)
     if (target === currentLevel) return
 
-    const cleared = LEVELS[target - 1].monsters.every((m) => defeatedIds.has(m.id))
     set({
       currentLevel: target,
-      phase: cleared ? 'exam' : 'exploring',
+      phase: 'exploring',
       targetId: null,
       monsterSwing: {},
       suppressAutoTarget: false,
@@ -403,12 +390,6 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   hydrateSave: (save) => {
     const defeated = new Set(save.defeatedMonsterIds)
-    // Nothing writes 'exam' to Supabase (phase isn't part of SaveData), so it
-    // has to be re-derived: a save whose current level has no monsters left
-    // is a save taken during that level's exam. Without this, reloading
-    // mid-exam would drop the player into an empty dungeon with every
-    // monster dead and no way left to reach the next level.
-    const levelCleared = LEVELS[save.currentLevel - 1]?.monsters.every((m) => defeated.has(m.id)) ?? false
 
     set({
       // A save can be persisted mid-death (damagePlayer writes playerHp: 0
@@ -417,7 +398,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       // would drop the player back into the level they died in — stale
       // defeatedIds, 0 HP, no game-over screen — instead of sending them
       // through the same reset restart() does.
-      phase: save.playerHp <= 0 ? 'gameover' : levelCleared ? 'exam' : 'exploring',
+      // Killing a boss moves currentLevel in the same breath, so there is no
+      // longer any "finished but still here" state to re-derive: a loaded save
+      // is either a dead run or a level in progress.
+      phase: save.playerHp <= 0 ? 'gameover' : 'exploring',
       defeatedIds: defeated,
       playerHp: save.playerHp,
       attackPower: save.attackPower,

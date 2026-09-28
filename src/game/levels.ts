@@ -139,7 +139,7 @@ const LEVEL_1_MONSTERS: MonsterData[] = [
 
   // end room
   { id: 'wraith-3', name: 'Echo Wraith', maxHp: 80, color: '#3a6bd1', attackDamage: 12, attackInterval: 10, position: [-3, 0.5, -37], modelUrl: '/monsters/echowraith_attack.glb', imageUrl: '/monsters/echowraith_attack.png' },
-  { id: 'dragon-1', name: 'Dragon', maxHp: 150, color: '#e05263', attackDamage: 20, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/dragon_attack.glb', imageUrl: '/monsters/dragon_attack.png' },
+  { id: 'dragon-1', name: 'Dragon', boss: true, maxHp: 150, color: '#e05263', attackDamage: 20, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/dragon_attack.glb', imageUrl: '/monsters/dragon_attack.png' },
 ]
 
 const LEVEL_1_PICKUPS: PickupData[] = [
@@ -251,7 +251,7 @@ const LEVEL_2_MONSTERS: MonsterData[] = [
 
   // end room
   { id: 'wraith-elite-2', name: 'Wraith Sovereign', maxHp: 120, color: '#4a3570', attackDamage: 18, attackInterval: 10, position: [-4, 0.5, -45], modelUrl: '/monsters/wraithsovereign_attack.glb', imageUrl: '/monsters/wraithsovereign_attack.png' },
-  { id: 'elder-dragon-1', name: 'Elder Dragon', maxHp: 260, color: '#c21f3a', attackDamage: 28, attackInterval: 10, position: [4, 0.5, -46], modelUrl: '/monsters/elderdragon_attack.glb', imageUrl: '/monsters/elderdragon_attack.png' },
+  { id: 'elder-dragon-1', name: 'Elder Dragon', boss: true, maxHp: 260, color: '#c21f3a', attackDamage: 28, attackInterval: 10, position: [4, 0.5, -46], modelUrl: '/monsters/elderdragon_attack.glb', imageUrl: '/monsters/elderdragon_attack.png' },
 
   // vault room
   { id: 'specter-3', name: 'Hollow Specter', maxHp: 60, color: '#7fb8d9', attackDamage: 14, attackInterval: 10, position: [-10, 0.5, -45], modelUrl: '/monsters/hollowspecter_attack.glb', imageUrl: '/monsters/hollowspecter_attack.png' },
@@ -359,7 +359,7 @@ const LEVEL_3_MONSTERS: MonsterData[] = [
   { id: 'banshee-2', name: 'Wailing Banshee', maxHp: 150, color: '#9f7fe8', attackDamage: 22, attackInterval: 10, position: [7, 0.5, -21], modelUrl: '/monsters/wailingbanshee_attack.glb', imageUrl: '/monsters/banshee_attack.svg' },
 
   { id: 'banshee-3', name: 'Shrieking Banshee', maxHp: 150, color: '#c7a8f0', attackDamage: 22, attackInterval: 10, position: [-3, 0.5, -37], modelUrl: '/monsters/shriekingbanshee_attack.glb', imageUrl: '/monsters/banshee_attack.svg' },
-  { id: 'hydra-1', name: 'Hydra', maxHp: 300, color: '#e0524f', attackDamage: 32, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/hydra_attack.glb', imageUrl: '/monsters/hydra_attack.svg' },
+  { id: 'hydra-1', name: 'Hydra', boss: true, maxHp: 300, color: '#e0524f', attackDamage: 32, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/hydra_attack.glb', imageUrl: '/monsters/hydra_attack.svg' },
 ]
 
 const LEVEL_3_PICKUPS: PickupData[] = [
@@ -444,7 +444,7 @@ const LEVEL_4_MONSTERS: MonsterData[] = [
   { id: 'hexsprite-2', name: 'Hex Imp', maxHp: 80, color: '#b06fe8', attackDamage: 18, attackInterval: 10, position: [7, 0.5, -26], modelUrl: '/monsters/heximp_attack.glb', imageUrl: '/monsters/heximp_attack.png' },
 
   { id: 'spellknight-2', name: 'Spell Warden', maxHp: 160, color: '#3a2f6a', attackDamage: 23, attackInterval: 10, position: [-4, 0.5, -45], modelUrl: '/monsters/spellwarden_attack.glb', imageUrl: '/monsters/spellwarden_attack.png' },
-  { id: 'archmage-1', name: 'Archmage', maxHp: 340, color: '#2b1d55', attackDamage: 34, attackInterval: 10, position: [4, 0.5, -46], modelUrl: '/monsters/archmage_attack.glb', imageUrl: '/monsters/archmage_attack.png' },
+  { id: 'archmage-1', name: 'Archmage', boss: true, maxHp: 340, color: '#2b1d55', attackDamage: 34, attackInterval: 10, position: [4, 0.5, -46], modelUrl: '/monsters/archmage_attack.glb', imageUrl: '/monsters/archmage_attack.png' },
 
   { id: 'hexsprite-3', name: 'Curse Sprite', maxHp: 80, color: '#e08fd0', attackDamage: 18, attackInterval: 10, position: [-10, 0.5, -45], modelUrl: '/monsters/cursesprite_attack.glb', imageUrl: '/monsters/cursesprite_attack.png' },
 ]
@@ -542,7 +542,7 @@ const LEVEL_5_MONSTERS: MonsterData[] = [
   { id: 'ghostlib-2', name: 'Whispering Librarian', maxHp: 200, color: '#b8c7e8', attackDamage: 26, attackInterval: 10, position: [7, 0.5, -21], modelUrl: '/monsters/whisperinglibrarian_attack.glb', imageUrl: '/monsters/07_WhisperingLibrarian.png' },
 
   { id: 'ghostlib-3', name: 'Silent Librarian', maxHp: 200, color: '#e0e8f8', attackDamage: 26, attackInterval: 10, position: [-3, 0.5, -37], modelUrl: '/monsters/silentlibrarian_attack.glb', imageUrl: '/monsters/08_SilentLibrarian.png' },
-  { id: 'tome-1', name: 'Forbidden Tome', maxHp: 380, color: '#3a2a66', attackDamage: 38, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/forbiddentome_attack.glb', imageUrl: '/monsters/09_ForbiddenTome.png' },
+  { id: 'tome-1', name: 'Forbidden Tome', boss: true, maxHp: 380, color: '#3a2a66', attackDamage: 38, attackInterval: 10, position: [3, 0.5, -37], modelUrl: '/monsters/forbiddentome_attack.glb', imageUrl: '/monsters/09_ForbiddenTome.png' },
 ]
 
 const LEVEL_5_PICKUPS: PickupData[] = [
@@ -640,7 +640,7 @@ const LEVEL_6_MONSTERS: MonsterData[] = [
   { id: 'cursedwisp-2', name: 'Hex Wisp', maxHp: 105, color: '#8a3f3f', attackDamage: 23, attackInterval: 10, position: [7, 0.5, -26], armor: 0, modelUrl: '/monsters/hexwisp_attack.glb', imageUrl: '/monsters/07_HexWisp.png' },
 
   { id: 'brokengolem-2', name: 'Shattered Golem', maxHp: 210, color: '#4a4238', attackDamage: 28, attackInterval: 10, position: [-4, 0.5, -45], armor: 0, modelUrl: '/monsters/shatteredgolem_attack.glb', imageUrl: '/monsters/03_BrokenGolem.png' },
-  { id: 'glitchwyrm-1', name: 'Glitch Wyrm', maxHp: 430, color: '#ff2e63', attackDamage: 42, attackInterval: 10, position: [4, 0.5, -46], armor: 0, modelUrl: '/monsters/glitchwyrm_attack.glb', imageUrl: '/monsters/09_GlitchWyrm.png' },
+  { id: 'glitchwyrm-1', name: 'Glitch Wyrm', boss: true, maxHp: 430, color: '#ff2e63', attackDamage: 42, attackInterval: 10, position: [4, 0.5, -46], armor: 0, modelUrl: '/monsters/glitchwyrm_attack.glb', imageUrl: '/monsters/09_GlitchWyrm.png' },
 
   { id: 'cursedwisp-3', name: 'Blight Wisp', maxHp: 105, color: '#a34f4f', attackDamage: 23, attackInterval: 10, position: [-10, 0.5, -45], armor: 0, modelUrl: '/monsters/blightwisp_attack.glb', imageUrl: '/monsters/10_BlightWisp.png' },
 ]
@@ -719,3 +719,27 @@ export const LEVELS: LevelData[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5,
 // monster's stats (not "every monster in the current level") can look it up
 // here without knowing which level is active.
 export const ALL_MONSTERS: MonsterData[] = LEVELS.flatMap((l) => l.monsters)
+
+// The boss's seal: the level's boss stays out of the dungeon entirely until
+// every other monster on the floor is dead. Killing the boss is what opens the
+// next level, so this is the rule that makes a level a level — the player has
+// to work through its cast before they get the fight that ends it, and a
+// dragon cannot be rushed the moment they walk in.
+export function bossOf(level: LevelData): MonsterData | undefined {
+  return level.monsters.find((m) => m.boss)
+}
+
+export function bossIsSealed(level: LevelData, defeatedIds: ReadonlySet<string>): boolean {
+  return level.monsters.some((m) => !m.boss && !defeatedIds.has(m.id))
+}
+
+// Everything the player can actually see, click, or be hit by right now:
+// alive, and not a boss still behind its seal. Every part of the fight reads
+// the level's monsters through this — what is drawn (GameScene), what Tab
+// cycles, what swings back (CombatTicker) and what can be locked
+// (store.setTarget) — so the seal cannot be true in one of them and false in
+// another.
+export function availableMonsters(level: LevelData, defeatedIds: ReadonlySet<string>): MonsterData[] {
+  const sealed = bossIsSealed(level, defeatedIds)
+  return level.monsters.filter((m) => !defeatedIds.has(m.id) && !(m.boss && sealed))
+}

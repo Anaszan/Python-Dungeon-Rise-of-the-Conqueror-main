@@ -16,7 +16,6 @@ import { PlayerHUD } from './screens/PlayerHUD'
 import { TouchJoystick } from './game/TouchJoystick'
 import { LevelBanner } from './screens/LevelBanner'
 import { GameOverOverlay } from './screens/GameOverOverlay'
-import { LevelExamOverlay } from './screens/LevelExamOverlay'
 import { VictoryOverlay } from './screens/VictoryOverlay'
 import { PauseButton } from './screens/PauseButton'
 import { PauseMenu } from './screens/PauseMenu'
@@ -48,7 +47,6 @@ function App() {
   const characterName = useGameStore((s) => s.characterName)
   const currentLevel = useGameStore((s) => s.currentLevel)
   const difficulty = useGameStore((s) => s.difficulty)
-  const phase = useGameStore((s) => s.phase)
 
   // Asked once per session, alongside the save: the answer decides whether the
   // admin console exists for this account at all. Cleared first so switching
@@ -169,26 +167,16 @@ function App() {
         <PlayerHUD />
         <TouchJoystick />
         <LevelBanner />
-        {/* Mounted only while the exam is up, unlike the other overlays,
-            which self-guard on phase and stay mounted. This one warms
-            Pyodide the moment it mounts — leaving it mounted would kick off
-            that multi-MB download as soon as the player enters the dungeon,
-            long before any code box exists to use it. */}
-        {phase === 'exam' && <LevelExamOverlay />}
         <GameOverOverlay />
         <VictoryOverlay />
-        {/* Hidden for the duration of the end-of-level exam: each opens a
-            modal, and the exam is the one screen the player is not allowed to
-            walk away from. Fights no longer hide them — combat happens in the
-            dungeon now, and a fight the player can walk out of is not a reason
-            to take the corner buttons away. */}
-        {phase !== 'exam' && (
-          <>
-            <Leaderboard />
-            <PlayerProfile />
-            <LogoutButton />
-          </>
-        )}
+        {/* Always up now. Fights do not hide them — combat happens in the
+            dungeon and a fight the player can walk out of is no reason to take
+            the corner buttons away — and the exam screen that used to demand
+            the whole screen is gone entirely (the level's boss took its
+            place). */}
+        <Leaderboard />
+        <PlayerProfile />
+        <LogoutButton />
         <PauseButton />
         <PauseMenu />
       </div>

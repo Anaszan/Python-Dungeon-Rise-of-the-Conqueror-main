@@ -1547,6 +1547,18 @@ canvas {
   font-size: 13px;
 }
 
+/* Replaces the counter once the floor is clear and the level's boss is
+   finally in the dungeon — red, because it is the one thing on the banner
+   that is a warning rather than a score. */
+.level-banner-boss {
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(184, 38, 44, 0.85);
+  color: #ffe9a8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .chapter-intro-panel {
   width: 100%;
   min-height: 100%;

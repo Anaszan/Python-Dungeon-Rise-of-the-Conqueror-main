@@ -6,16 +6,10 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { ALL_MONSTERS, LEVELS, LIGHT_DECORATION_KINDS } from './levels'
+import { ALL_MONSTERS, availableMonsters, bossIsSealed, bossOf, LEVELS, LIGHT_DECORATION_KINDS } from './levels'
 import { LESSONS } from './lessons'
 import { canStandAt, hitsWall, isWalkable } from './dungeon'
-import {
-  ATTACK_PICKUP_AMOUNT,
-  BASE_ATTACK_POWER,
-  MONSTER_AGGRO_RANGE,
-  LANTERN_RADIUS,
-  SKILL_DAMAGE_MULTIPLIER,
-} from './constants'
+import { ATTACK_PICKUP_AMOUNT, MONSTER_AGGRO_RANGE, LANTERN_RADIUS } from './constants'
 
 // Level *authoring* checks — the things that would make a level unfinishable
 // or unfair without ever throwing an error at runtime. dungeon.test.ts covers
@@ -133,9 +127,9 @@ describe('campaign', () => {
   })
 
   it('hands out the same flat power step for every attack pickup', () => {
-    // The exam damage targets below are sized against a player who has picked
-    // up nothing at all, and the whole curve is "BASE + 10 per potion" — a
-    // one-off bigger potion would quietly break both assumptions.
+    // The whole power curve is "BASE + 10 per potion", and the boss HP in
+    // levels.ts is sized against it — a one-off bigger potion would quietly
+    // break that.
     for (const pickup of LEVELS.flatMap((l) => l.pickups)) {
       if (pickup.kind !== 'attack') continue
       expect(pickup.amount, `${pickup.id} is off the flat power curve`).toBe(ATTACK_PICKUP_AMOUNT)
@@ -143,109 +137,41 @@ describe('campaign', () => {
   })
 })
 
-// A correct answer to each chapter's end-of-level exam, kept here rather than
-// in lessons.ts because the player must never be shipped the solution. Its
-// job is to prove the `checks` regexes are actually satisfiable by real,
-// idiomatic code for that chapter — a typo'd pattern that nothing can match
-// would wall the player into a level with no way out, and there is no way to
-// notice that short of playing to the end of a level.
-//
-// Only the regexes are asserted here; running these needs Pyodide, which is a
-// CDN download at runtime and is not available in vitest. They are still
-// written to genuinely clear their guardian at the worst-case atk of
-// BASE_ATTACK_POWER, remembering castSpell's per-call caps (attack ≤ atk,
-// skill ≤ atk × SKILL_DAMAGE_MULTIPLIER), so they stay honest answers rather
-// than regex bait.
-const EXAM_SOLUTIONS: Record<number, string> = {
-  // ch2 — variables. 60 damage vs a 60 HP guardian.
-  2: `damage = atk * 2
-print(damage)
-skill(damage)
-`,
-  // ch3 — conditionals. 90 damage (one maxed skill) vs a 90 HP guardian.
-  3: `if monster_hp > 50:
-    power = atk * 3
-else:
-    power = atk
-skill(power)
-`,
-  // ch4 — loops. 4 × 30 vs a 120 HP guardian.
-  4: `for i in range(4):
-    attack(atk)
-`,
-  // ch5 — functions. 90 (capped skill) + 30 (capped attack) vs 120 HP.
-  5: `def fireball(power):
-    return power * 3
-
-skill(fireball(atk))
-attack(fireball(atk))
-`,
-  // ch6 — files. 90 damage vs a 90 HP guardian.
-  6: `with open("spellbook.txt", "w") as f:
-    f.write(str(atk))
-
-with open("spellbook.txt", "r") as f:
-    damage = int(f.read())
-
-skill(damage * 3)
-`,
-  // ch7 — error handling. The division blows up, the fallback lands 90, and
-  // the follow-up attack covers the last 30 of a 120 HP guardian.
-  7: `try:
-    power = atk // monster_armor
-except ZeroDivisionError:
-    power = atk * 3
-skill(power)
-attack(atk)
-`,
-}
-
-describe.each(LESSONS)('level exam for chapter $chapter ($chapterTitle)', (lesson) => {
-  const { exam } = lesson
-
-  it('asks for something, and starts the player from a blank slate', () => {
-    expect(exam.checks.length).toBeGreaterThan(0)
-    expect(exam.brief.length).toBeGreaterThan(0)
-    expect(exam.hints.length).toBeGreaterThan(0)
-    // The exam is the one place the player writes the chapter from scratch —
-    // a `___` in here would make it another fill-in-the-blank exercise.
-    expect(exam.starterCode).not.toContain('___')
+// The boss seal: every level ends on one boss, and that boss is not in the
+// dungeon until the rest of the floor is dead. Killing it is what opens the
+// next level (store.damageMonster), so an unreachable or duplicated boss is a
+// level nobody can finish.
+describe.each(LEVELS)('level $level ($name) boss', (level) => {
+  it('has exactly one', () => {
+    expect(level.monsters.filter((m) => m.boss).map((m) => m.name)).toHaveLength(1)
   })
 
-  it('uses non-global check patterns', () => {
-    // LevelExamOverlay re-tests every pattern on each keystroke. A /g regex
-    // carries lastIndex between .test() calls, so the checklist would flicker
-    // between passing and failing as the player types.
-    for (const check of exam.checks) {
-      expect(check.pattern.global, `${check.label} uses a global regex`).toBe(false)
+  it('is the toughest thing on the floor', () => {
+    // Not a rule the code depends on, but a level whose boss is weaker than
+    // the minions it hides behind is an authoring mistake every time.
+    const boss = bossOf(level)!
+    for (const minion of level.monsters.filter((m) => !m.boss)) {
+      expect(boss.maxHp, `${minion.name} out-tanks the boss`).toBeGreaterThan(minion.maxHp)
     }
   })
 
-  it('does not hand out any check for free in the starter code', () => {
-    for (const check of exam.checks) {
-      expect(check.pattern.test(exam.starterCode), `${check.label} already passes on an untouched editor`).toBe(false)
-    }
-  })
+  it('stays sealed until the last minion dies, then walks in', () => {
+    const minions = level.monsters.filter((m) => !m.boss)
+    const boss = bossOf(level)!
 
-  it('passes every check on a real answer for its chapter', () => {
-    const solution = EXAM_SOLUTIONS[lesson.chapter]
-    expect(solution, `no reference solution for chapter ${lesson.chapter}`).toBeTruthy()
-    for (const check of exam.checks) {
-      expect(check.pattern.test(solution), `${check.label} rejects a correct chapter-${lesson.chapter} answer`).toBe(true)
-    }
-  })
+    expect(bossIsSealed(level, new Set())).toBe(true)
+    expect(availableMonsters(level, new Set()), 'sealed boss is on the floor').not.toContain(boss)
 
-  it('sets a guardian a player who collected nothing can still bring down', () => {
-    // Worst case is a player who walked past every attack potion, so their
-    // atk is still BASE_ATTACK_POWER. castSpell caps one skill() call at
-    // atk × SKILL_DAMAGE_MULTIPLIER, and the guardian is restored to full
-    // before each run — so anything past a couple of maxed casts turns the
-    // exam into a damage grind rather than a test of the chapter.
-    const strongestCast = BASE_ATTACK_POWER * SKILL_DAMAGE_MULTIPLIER
-    expect(exam.guardianHp).toBeGreaterThan(0)
-    expect(exam.guardianHp, 'guardian needs more than two maxed casts at base atk').toBeLessThanOrEqual(
-      strongestCast * 2,
-    )
+    // One short of clear — still sealed.
+    const allButOne = new Set(minions.slice(0, -1).map((m) => m.id))
+    expect(bossIsSealed(level, allButOne)).toBe(true)
+
+    const clear = new Set(minions.map((m) => m.id))
+    expect(bossIsSealed(level, clear)).toBe(false)
+    expect(availableMonsters(level, clear)).toEqual([boss])
+
+    // And a dead boss is not on the floor either.
+    expect(availableMonsters(level, new Set([...clear, boss.id]))).toEqual([])
   })
 })
 

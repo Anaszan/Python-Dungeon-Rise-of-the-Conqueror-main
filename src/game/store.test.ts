@@ -36,13 +36,25 @@ function killAllButLastInLevel(levelIndex: number) {
   })
 }
 
-// And the killing blow itself, which is the only thing that opens an exam.
-function clearLevel(levelIndex: number) {
-  killAllButLastInLevel(levelIndex)
+// Every minion dead and the boss still standing: the state in which the boss
+// has just broken out of its seal and is the only thing left to fight.
+function clearMinionsOf(levelIndex: number) {
   const monsters = LEVELS[levelIndex].monsters
-  const last = monsters[monsters.length - 1]
-  useGameStore.getState().setTarget(last.id)
-  useGameStore.getState().damageMonster(last.maxHp)
+  useGameStore.setState({
+    currentLevel: levelIndex + 1,
+    defeatedIds: new Set(monsters.filter((m) => !m.boss).map((m) => m.id)),
+    playerHp: 100,
+    phase: 'exploring',
+  })
+  return monsters.find((m) => m.boss)!
+}
+
+// And the kill that ends the level: the boss, which is the only way onward
+// now that the exam door is gone.
+function clearLevel(levelIndex: number) {
+  const boss = clearMinionsOf(levelIndex)
+  useGameStore.getState().setTarget(boss.id)
+  useGameStore.getState().damageMonster(boss.maxHp)
 }
 
 const loadedSave = {
@@ -131,10 +143,10 @@ describe('useGameStore', () => {
       expect(useGameStore.getState().targetId).toBeNull()
     })
 
-    // The exam and the game-over screen are both modal. A target lock left
-    // open under one would put a live code console on top of them.
+    // The game-over and victory screens are modal. A target lock left open
+    // under one would put a live code console on top of them.
     it('refuses to lock while anything but the dungeon is on screen', () => {
-      useGameStore.setState({ phase: 'exam' })
+      useGameStore.setState({ phase: 'gameover' })
       useGameStore.getState().setTarget('slime-1')
       expect(useGameStore.getState().targetId).toBeNull()
     })
@@ -212,44 +224,62 @@ describe('useGameStore', () => {
     expect(useGameStore.getState().playerHp).toBe(PLAYER_MAX_HP)
   })
 
-  it('the killing blow on a level’s last monster opens that level’s exam', () => {
-    killAllButLastInLevel(0)
-    const last = LEVELS[0].monsters[LEVELS[0].monsters.length - 1]
-    useGameStore.getState().setTarget(last.id)
+  // The boss is the door out of a level now. There is no screen in between:
+  // the killing blow hands over the next level on the spot.
+  describe('the boss', () => {
+    it('cannot be touched while one of its minions is still alive', () => {
+      const boss = LEVELS[0].monsters.find((m) => m.boss)!
+      killAllButLastInLevel(0) // kills everything except the *last* monster...
+      // ...which for level 1 is the boss itself, so the floor is not clear:
+      // one straggler is what the seal is made of.
+      useGameStore.setState({
+        defeatedIds: new Set(LEVELS[0].monsters.filter((m) => !m.boss).slice(0, -1).map((m) => m.id)),
+      })
 
-    useGameStore.getState().damageMonster(last.maxHp)
+      useGameStore.getState().setTarget(boss.id)
 
-    const s = useGameStore.getState()
-    expect(s.phase).toBe('exam')
-    expect(s.currentLevel).toBe(1) // still level 1 — the exam has not been passed yet
-    expect(s.targetId).toBeNull()
-  })
+      expect(useGameStore.getState().targetId, 'a sealed boss is not in the dungeon').toBeNull()
+    })
 
-  it('passLevelExam is what actually advances the level', () => {
-    clearLevel(0)
+    it('can be fought the moment the floor is clear', () => {
+      const boss = clearMinionsOf(0)
+      useGameStore.getState().setTarget(boss.id)
+      expect(useGameStore.getState().targetId).toBe(boss.id)
+    })
 
-    useGameStore.getState().passLevelExam()
+    it('opens the next level when it dies — no exam, no door', () => {
+      const boss = clearMinionsOf(0)
+      useGameStore.getState().setTarget(boss.id)
 
-    const s = useGameStore.getState()
-    expect(s.currentLevel).toBe(2)
-    expect(s.phase).toBe('exploring')
-  })
+      useGameStore.getState().damageMonster(boss.maxHp)
 
-  it('passLevelExam does nothing outside the exam phase', () => {
-    useGameStore.setState({ currentLevel: 1, phase: 'exploring' })
+      const s = useGameStore.getState()
+      expect(s.currentLevel, 'straight through to level 2').toBe(2)
+      expect(s.phase).toBe('exploring')
+      expect(s.targetId).toBeNull()
+      expect(s.lastPosition, 'the new level starts at its own entrance').toBeNull()
+    })
 
-    useGameStore.getState().passLevelExam()
+    it('does not open anything when a minion dies', () => {
+      killAllButLastInLevel(0)
+      const straggler = LEVELS[0].monsters.filter((m) => !m.boss).at(-1)!
+      useGameStore.getState().setTarget(straggler.id)
 
-    expect(useGameStore.getState().currentLevel).toBe(1)
-    expect(useGameStore.getState().phase).toBe('exploring')
-  })
+      useGameStore.getState().damageMonster(straggler.maxHp)
 
-  it('the final level reaches victory through its exam, not around it', () => {
-    clearLevel(LEVELS.length - 1)
-    expect(useGameStore.getState().phase).toBe('exam')
+      expect(useGameStore.getState().currentLevel, 'still on the same floor').toBe(1)
+      expect(useGameStore.getState().phase).toBe('exploring')
+    })
 
-    useGameStore.getState().passLevelExam()
-    expect(useGameStore.getState().phase).toBe('victory')
+    it('ends the game when the last level’s boss goes down', () => {
+      const boss = clearMinionsOf(LEVELS.length - 1)
+      useGameStore.getState().setTarget(boss.id)
+
+      useGameStore.getState().damageMonster(boss.maxHp)
+
+      expect(useGameStore.getState().phase).toBe('victory')
+      expect(useGameStore.getState().currentLevel).toBe(LEVELS.length)
+    })
   })
 
   // The admin warp (src/admin/) is the one thing in the game that moves
@@ -296,9 +326,8 @@ describe('useGameStore', () => {
       useGameStore.getState().warpToLevel(3)
       expect(useGameStore.getState().lastPosition, 'warp').toBeNull()
 
-      clearLevel(0)
       useGameStore.setState({ lastPosition: spot })
-      useGameStore.getState().passLevelExam()
+      clearLevel(0)
       expect(useGameStore.getState().lastPosition, 'next level').toBeNull()
 
       useGameStore.setState({ lastPosition: spot })
@@ -320,16 +349,15 @@ describe('useGameStore', () => {
       expect(s.defeatedIds.has('slime-1')).toBe(true)
     })
 
-    it('lands on the exam when the target level is already cleared', () => {
-      // 'exam' is only ever entered by leaving a fight, and a cleared level
-      // has none left — without deriving it here the admin would arrive in an
-      // empty dungeon with no way out of it.
+    it('lands on an empty floor when the target level is already cleared', () => {
+      // Only reachable by admin warp: normal play never leaves a finished
+      // level behind, because finishing one *is* moving to the next.
       const ids = LEVELS[2].monsters.map((m) => m.id)
       useGameStore.setState({ currentLevel: 1, playerHp: 100, defeatedIds: new Set(ids) })
 
       useGameStore.getState().warpToLevel(3)
 
-      expect(useGameStore.getState().phase).toBe('exam')
+      expect(useGameStore.getState().phase).toBe('exploring')
       expect(useGameStore.getState().currentLevel).toBe(3)
     })
 
@@ -414,7 +442,10 @@ describe('useGameStore', () => {
     })
   })
 
-  it('hydrateSave derives the exam phase from a save whose level has no monsters left', () => {
+  // Saved *during* a level, which is the only kind of save there is now:
+  // killing the boss moves currentLevel in the same breath, so a finished
+  // level is never what gets written.
+  it('hydrateSave drops a living save straight back into the dungeon', () => {
     useGameStore.getState().hydrateSave({
       defeatedMonsterIds: LEVELS[0].monsters.map((m) => m.id),
       playerHp: 120,
@@ -431,7 +462,7 @@ describe('useGameStore', () => {
       lastPosition: null,
     })
     const s = useGameStore.getState()
-    expect(s.phase).toBe('exam')
+    expect(s.phase).toBe('exploring')
     expect(s.currentLevel).toBe(1)
   })
 
@@ -518,23 +549,16 @@ describe('useGameStore', () => {
 })
 
 // Driving the real store through the whole campaign the way a player would:
-// click every monster of a level, kill it, sit the end-of-level exam, and
-// expect the game to hand out the next level — and the victory screen after
-// the last one. The individual cases above each pin one branch; this is the
-// check that all six levels really do chain together end to end.
+// work down every monster on the floor, then the boss it was hiding, and
+// expect the next level on the spot — and the victory screen after the last
+// one. The individual cases above each pin one branch; this is the check that
+// all six levels really do chain together end to end.
 function fightAndDefeat(monster: (typeof ALL_MONSTERS)[number]) {
   useGameStore.getState().setTarget(monster.id)
   expect(useGameStore.getState().targetId, `targeting ${monster.name}`).toBe(monster.id)
   useGameStore.getState().damageMonster(monster.maxHp)
   expect(useGameStore.getState().monsterHp[monster.id], `${monster.name} HP`).toBe(0)
   expect(useGameStore.getState().targetId, `${monster.name} is still targeted after dying`).toBeNull()
-}
-
-// Stands in for the player actually writing and passing the level's exam in
-// LevelExamOverlay — the store side of that is just this one call.
-function sitAndPassExam(levelNumber: number) {
-  expect(useGameStore.getState().phase, `exam for level ${levelNumber}`).toBe('exam')
-  useGameStore.getState().passLevelExam()
 }
 
 describe('level completion', () => {
@@ -547,8 +571,9 @@ describe('level completion', () => {
       expect(useGameStore.getState().currentLevel, `start of level ${level.level}`).toBe(level.level)
       expect(useGameStore.getState().phase, `start of level ${level.level}`).toBe('exploring')
 
-      level.monsters.forEach(fightAndDefeat)
-      sitAndPassExam(level.level)
+      // Minions first: the boss cannot even be targeted until they are gone.
+      level.monsters.filter((m) => !m.boss).forEach(fightAndDefeat)
+      fightAndDefeat(level.monsters.find((m) => m.boss)!)
     }
 
     const s = useGameStore.getState()
@@ -557,38 +582,40 @@ describe('level completion', () => {
     expect(s.defeatedIds.size).toBe(ALL_MONSTERS.length)
   })
 
-  it.each(LEVELS)('level $level does not open the exam while one monster is still alive', (level) => {
+  it.each(LEVELS)('level $level keeps its boss sealed until the floor is clear', (level) => {
     useGameStore.setState({ currentLevel: level.level })
+    const minions = level.monsters.filter((m) => !m.boss)
+    const boss = level.monsters.find((m) => m.boss)!
 
-    // Everything but the last monster in the level.
-    level.monsters.slice(0, -1).forEach(fightAndDefeat)
+    // One minion short of clear: the boss is still not there to be fought.
+    minions.slice(0, -1).forEach(fightAndDefeat)
+    useGameStore.getState().setTarget(boss.id)
+    expect(useGameStore.getState().targetId, 'boss reachable too early').toBeNull()
     expect(useGameStore.getState().currentLevel, 'advanced early').toBe(level.level)
+
+    // The last minion drops and the boss walks in.
+    fightAndDefeat(minions[minions.length - 1])
+    expect(useGameStore.getState().currentLevel, 'a minion must not end the level').toBe(level.level)
     expect(useGameStore.getState().phase).toBe('exploring')
 
-    // And now the straggler, which is what should actually open the exam.
-    const last = level.monsters[level.monsters.length - 1]
-    fightAndDefeat(last)
-    expect(useGameStore.getState().phase, 'exam should be open now').toBe('exam')
-    expect(useGameStore.getState().currentLevel, 'level moved before the exam').toBe(level.level)
-
-    sitAndPassExam(level.level)
+    fightAndDefeat(boss)
     const s = useGameStore.getState()
     if (level.level === LEVELS.length) expect(s.phase).toBe('victory')
     else expect(s.currentLevel).toBe(level.level + 1)
   })
 
-  it('treats walking away from the final monster as leaving the level unfinished', () => {
+  it('treats walking away from a wounded boss as leaving the level unfinished', () => {
     const level = LEVELS[0]
-    level.monsters.slice(0, -1).forEach(fightAndDefeat)
+    level.monsters.filter((m) => !m.boss).forEach(fightAndDefeat)
 
-    const last = level.monsters[level.monsters.length - 1]
-    useGameStore.getState().setTarget(last.id)
-    useGameStore.getState().damageMonster(last.maxHp - 1) // hurt, never killed
+    const boss = level.monsters.find((m) => m.boss)!
+    useGameStore.getState().setTarget(boss.id)
+    useGameStore.getState().damageMonster(boss.maxHp - 1) // hurt, never killed
     useGameStore.getState().setTarget(null)
 
     const s = useGameStore.getState()
     expect(s.currentLevel).toBe(1)
     expect(s.phase).toBe('exploring')
-    expect(s.monsterHp[last.id]).toBe(1)
+    expect(s.monsterHp[boss.id]).toBe(1)
   })
 })
