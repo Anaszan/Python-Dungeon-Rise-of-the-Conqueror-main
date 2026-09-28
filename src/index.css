@@ -2707,10 +2707,12 @@ canvas {
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
 }
 
+/* Holds the boss's live 3D model (MonsterPortrait). Unlike the flat image it
+   replaced, a canvas has no intrinsic size — it fills whatever box it is
+   given, so the box is the one that has to be square and explicit. */
 .boss-intro-art {
-  width: clamp(120px, 26vh, 240px);
-  height: auto;
-  object-fit: contain;
+  width: clamp(150px, 30vh, 280px);
+  height: clamp(150px, 30vh, 280px);
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.8));
   animation: boss-art-in 700ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }

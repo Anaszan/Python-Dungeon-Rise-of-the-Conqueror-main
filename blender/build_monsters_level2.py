@@ -1,12 +1,11 @@
 """Build level 2's ten monsters as rigged low-poly GLB models with an attack loop.
 
-Level 1's cast (blender/build_monsters.py) is modelled the same way, but every
-part is joined into one static mesh and exported with export_animations=False —
-the "_attack" in those filenames is only a naming convention inherited from the
-2D art, not an animation. This script keeps each monster split into rig groups
-(legs, torso, head, arms, weapon, wings, tail...), parents them into a real
-hierarchy, keyframes a one-second attack loop, and exports it as a glTF
-animation that Monster.tsx plays with useAnimations.
+Level 1's cast (blender/build_monsters.py) is modelled and rigged the same way,
+on the plainest loops of the six — that script imports this one for the rig, the
+primitives and the shared attack loops, as levels 3-6 do. This script keeps each
+monster split into rig groups (legs, torso, head, arms, weapon, wings, tail...),
+parents them into a real hierarchy, keyframes a one-second attack loop, and
+exports it as a glTF animation that Monster.tsx plays with useAnimations.
 
 Footprint matches level 1 exactly so nothing needs per-file tuning: X-centred,
 base at local y=0, top at or below local y=2 (glTF is Y-up, Blender is Z-up —

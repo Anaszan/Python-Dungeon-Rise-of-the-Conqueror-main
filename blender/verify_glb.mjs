@@ -1,10 +1,15 @@
-// Loads each rigged GLB the way the game does and checks the clip actually
+// Loads every rigged GLB the way the game does and checks the clip actually
 // binds to the rig: every track has to resolve to a node inside the model.
+// All six levels are in here now — level 1's cast was the last one still
+// exporting a single static pose.
 import { readFileSync } from 'node:fs'
 import { AnimationMixer, LoopRepeat, PropertyBinding } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 const names = [
+  // level 1
+  'slime', 'glitchslime', 'goblin', 'goblinscout', 'goblinbrute',
+  'wraith', 'nullwraith', 'echowraith', 'dragon',
   // level 2
   'goblinwarrior', 'goblinmarauder', 'orc', 'orcberserker', 'ghostspecter',
   'wispspecter', 'hollowspecter', 'wraithelite', 'wraithsovereign', 'elderdragon',

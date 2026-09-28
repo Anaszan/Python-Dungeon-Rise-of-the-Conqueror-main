@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useGameStore } from '../game/store'
 import { ALL_MONSTERS, LEVELS } from '../game/levels'
+import { MonsterPortrait } from '../game/MonsterPortrait'
 
 // How long the entrance plays before handing the dungeon back. Long enough to
 // read the name and see the thing, short enough that a player clearing six
@@ -55,7 +56,11 @@ export function BossIntro() {
 
       <div className="boss-intro-content">
         <p className="boss-intro-eyebrow">ผนึกแตกแล้ว · ด่าน {currentLevel}</p>
-        {boss.imageUrl && <img className="boss-intro-art" src={boss.imageUrl} alt={boss.name} />}
+        {/* The boss's own model, not a picture of it — same GLB the dungeon
+            is drawing two steps away (see MonsterPortrait). */}
+        <div className="boss-intro-art">
+          <MonsterPortrait monster={boss} />
+        </div>
         <h2 className="boss-intro-name">{boss.name}</h2>
         <p className="boss-intro-sub">
           บอสประจำ{LEVELS[currentLevel - 1].name}ปรากฏตัว — คาถาปิดผนึกต้องเขียนเองทั้งหมด

@@ -119,10 +119,15 @@ const LEVEL_1_WALLS: Wall[] = [
 
 // Every monster in a level is a distinct type — no two share a name, even
 // when they occupy the same "tier" (e.g. two corridor trash mobs). Level 1
-// gives every monster its own art twice over: a low-poly 3D model built in
-// Blender (public/monsters/*.glb, sources in blender/) for the dungeon, and
-// the sprite the combat screen needs; other levels still reuse a shared
-// sprite per stat tier under a new name/color.
+// gives every monster its own art twice over: a rigged low-poly model built in
+// Blender (public/monsters/*.glb, source in blender/build_monsters.py) for the
+// dungeon, and its own sprite besides; other levels still reuse a shared sprite
+// per stat tier under a new name/color.
+//
+// Their attack loops are deliberately the plainest of the six — the Slime hops
+// and lands flat, the goblins swing what they are holding, the wraiths sweep
+// their sleeves down, the Dragon rears and bites. One clean motion each and no
+// gimmick, because every later level's loop is built to read against this one.
 const LEVEL_1_MONSTERS: MonsterData[] = [
   // main corridor
   { id: 'slime-1', name: 'Slime', maxHp: 30, color: '#6fdc4f', attackDamage: 5, attackInterval: 10, position: [0, 0.5, -4], modelUrl: '/monsters/slime_attack.glb', imageUrl: '/monsters/slime_attack.png' },
