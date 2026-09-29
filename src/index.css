@@ -2889,6 +2889,12 @@ canvas {
 .suspended-panel {
   max-width: 460px;
   margin: 0 auto;
+  /* Same trap as .pause-panel: .customize-panel's side padding is
+     viewport-relative (up to 340px/side) because it normally spans the whole
+     screen. Capping the width without capping the padding left no room for
+     content and wrapped the text one character per line. */
+  padding: calc(40px + env(safe-area-inset-top)) calc(28px + env(safe-area-inset-right))
+    calc(48px + env(safe-area-inset-bottom)) calc(28px + env(safe-area-inset-left));
   text-align: center;
 }
 
