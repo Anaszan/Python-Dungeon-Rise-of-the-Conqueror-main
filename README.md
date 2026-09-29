@@ -124,6 +124,8 @@ supabase/
   migrations_012_admin.sql   ระบบแอดมิน: ตาราง admin_emails (allow-list, RLS ปิดตาย เข้าถึงผ่านฟังก์ชันเท่านั้น),
                              ฟังก์ชัน is_admin() และ get_admin_player_overview() สำหรับแดชบอร์ดผู้เล่น
   migrations_013_last_position.sql   เพิ่ม game_saves.last_position ({level, x, z}) จำตำแหน่งที่ยืนอยู่ ล็อกอินกลับมาอยู่ที่เดิม
+  migrations_014_admin_user_management.sql   ระบบจัดการผู้ใช้ของแอดมิน (เพิ่ม/แก้ไข/ลบ/ระงับ) + คอลัมน์
+                             profiles.suspended_at และ RLS ที่ปฏิเสธการเขียนของผู้ถูกระงับ
 ```
 
 ## กติกาเกม
@@ -405,6 +407,30 @@ Pyodide โหลดแบบ lazy จาก jsdelivr CDN (`https://cdn.jsdelivr
 - **เข้าได้ 2 ทาง**: ปุ่มลอย 🛡 มุมซ้ายล่าง และเมนูหยุดชั่วคราว (โผล่เฉพาะแอดมิน) — แผงจะเรนเดอร์ที่ระดับ `App.tsx` จึงเปิดได้ทั้ง
   ตอนอยู่หน้า ChapterIntro และตอนอยู่ในดันเจี้ยน
 
+### จัดการผู้ใช้ (migrations_014)
+
+ครบทั้ง 4 อย่างตามข้อกำหนด — **เพิ่ม / แก้ไข / ลบ / ระงับ** อยู่ในส่วน "จัดการผู้ใช้" ของแผงแอดมิน แต่ละปุ่มเรียก RPC ที่ตรวจ
+`is_admin()` ในฐานข้อมูลเอง
+
+| การกระทำ | ฟังก์ชัน | หมายเหตุ |
+|---|---|---|
+| **เพิ่ม** | `admin_create_player(email, password, display_name, nickname)` | สร้างบัญชีแบบยืนยันอีเมลแล้ว ล็อกอินได้ทันที รหัสผ่านขั้นต่ำ 8 ตัว |
+| **แก้ไข** | `admin_update_player(...)` | ชื่อที่แสดง/ชื่อเล่น/ชื่อตัวละคร + ด่าน/HP/พลังโจมตี — ช่องที่ส่ง `null` มาจะไม่ถูกแตะ |
+| **ลบ** | `admin_delete_player(user_id)` | ลบ `auth.users` แล้ว cascade ทั้ง profiles / game_saves / user_contacts / scores · ลบตัวเองไม่ได้ |
+| **ระงับ** | `admin_set_suspended(user_id, boolean, reason)` | ตั้ง `profiles.suspended_at` + เหตุผล · ระงับตัวเองไม่ได้ |
+| (เสริม) สิทธิ์แอดมิน | `admin_set_admin(email, boolean)` | เพิ่ม/ถอดแถวใน `admin_emails` จากหน้าเว็บ · ถอดสิทธิ์ตัวเองไม่ได้ |
+| (เสริม) รีเซ็ตรหัสผ่าน | `supabase.auth.resetPasswordForEmail` | ส่งลิงก์ไปที่อีเมลผู้เล่น แอดมินไม่เห็นรหัสผ่านใหม่ |
+
+**"ระงับ" มีผลจริงที่ฐานข้อมูล ไม่ใช่แค่ซ่อน UI** — RLS ของ `game_saves` ถูกแยกเป็น select/insert/update/delete โดยฝั่งเขียน
+ทั้งหมดมีเงื่อนไข `not is_suspended(auth.uid())` เพิ่มเข้าไป (รวมถึง `scores` และการแก้ `profiles` ของตัวเอง) ผู้ถูกระงับยัง
+**อ่าน**เซฟตัวเองได้ เพื่อให้เกมรู้ว่าเขาเป็นใครแล้วขึ้นหน้า `SuspendedScreen` แทนดันเจี้ยน ถึงจะแก้ JavaScript ในเบราว์เซอร์ก็เขียน
+อะไรไม่ได้สักแถว
+
+**ข้อควรรู้เรื่อง `admin_create_player`**: มันเขียนลงตาราง `auth.users` / `auth.identities` ของ GoTrue ตรง ๆ (ใช้ `pgcrypto`
+แฮชรหัสผ่าน) ซึ่ง Supabase ไม่ได้รับรองอย่างเป็นทางการ — เลือกทางนี้เพราะทางที่ถูกต้องกว่าต้องใช้ `service_role` key ซึ่ง
+**ห้ามฝังในหน้าเว็บเด็ดขาด** ถ้าวันหนึ่ง Supabase เปลี่ยนโครงตารางจนฟังก์ชันนี้พัง ทางแก้คือย้าย**เฉพาะฟังก์ชันนี้**ไปเป็น Edge
+Function ที่เรียก `auth.admin.createUser` ส่วนที่เหลือในไฟล์ไม่ต้องแก้
+
 **เรื่องความปลอดภัย** — จุดที่ตัดสินว่าใครเป็นแอดมินอยู่ที่ฐานข้อมูล ไม่ใช่ที่ client:
 
 - allow-list เป็นตาราง `public.admin_emails` ที่ **เปิด RLS แต่ไม่มี policy เลย** → client ปกติอ่านไม่ได้เลย เข้าถึงได้เฉพาะ
@@ -475,6 +501,17 @@ session จะถูก sync อัตโนมัติผ่าน `onAuthStat
 - โมเดลตัวละครใน `public/models/{warrior,cleric,wizard,rogue}/` เป็นชุด "LowPoly RPG Characters" โดย Quaternius สัญญาอนุญาต CC0 1.0 (ดู `License.txt` ในแต่ละโฟลเดอร์) ใช้แทนโมเดล capsule/สีเดิม เพื่อความสวยงามแบบแฟนตาซีใกล้เคียง Ragnarok — ไม่ใช่ asset ต้นฉบับของ Ragnarok Online ซึ่งมีลิขสิทธิ์และใช้ไม่ได้
 
 ## บันทึกการพัฒนา (Changelog)
+
+### 2026-09-30 — แอดมินจัดการผู้ใช้ได้ (เพิ่ม/แก้ไข/ลบ/ระงับ)
+
+- `supabase/migrations_014_admin_user_management.sql`: RPC `admin_create_player` / `admin_update_player` /
+  `admin_delete_player` / `admin_set_suspended` / `admin_set_admin` ทุกตัวตรวจ `is_admin()` ในฐานข้อมูลเอง
+- **ระงับผู้ใช้บังคับที่ RLS**: แยก policy ของ `game_saves` เป็น select/insert/update/delete แล้วใส่เงื่อนไข
+  `not is_suspended(auth.uid())` ในฝั่งเขียน (รวม `scores` และ `profiles`) — ผู้ถูกระงับล็อกอินได้ อ่านเซฟตัวเองได้
+  แต่เขียนอะไรไม่ได้เลย และเกมขึ้นหน้า `SuspendedScreen` พร้อมเหตุผลแทนดันเจี้ยน
+- แผงแอดมินมีส่วน "จัดการผู้ใช้": ฟอร์มเพิ่มผู้ใช้, ฟอร์มแก้ไขรายคน (ชื่อ/ด่าน/HP/ATK + ให้สิทธิ์แอดมิน + ส่งอีเมลรีเซ็ตรหัสผ่าน),
+  ปุ่มระงับ/ปลดระงับพร้อมบันทึกเหตุผล และปุ่มลบที่ต้องพิมพ์ยืนยัน
+- แดชบอร์ดดึงรายชื่อจาก `auth.users` แทน `game_saves` แล้ว — บัญชีที่เพิ่งสร้างและยังไม่เคยเล่นก็ต้องมองเห็นและจัดการได้
 
 ### 2026-09-28 (2) — คัตซีนบอส + บอสใช้โจทย์แบบประตูเดิม + แอดมินรีเซ็ตมอนสเตอร์
 

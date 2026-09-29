@@ -16,6 +16,7 @@ import { PlayerHUD } from './screens/PlayerHUD'
 import { TouchJoystick } from './game/TouchJoystick'
 import { LevelBanner } from './screens/LevelBanner'
 import { BossIntro } from './screens/BossIntro'
+import { SuspendedScreen } from './screens/SuspendedScreen'
 import { GameOverOverlay } from './screens/GameOverOverlay'
 import { VictoryOverlay } from './screens/VictoryOverlay'
 import { PauseButton } from './screens/PauseButton'
@@ -24,6 +25,7 @@ import { GameAudio } from './audio/GameAudio'
 import { MenuAudio } from './audio/MenuAudio'
 import { SoundToggle } from './audio/SoundToggle'
 import { AdminButton } from './admin/AdminButton'
+import { fetchMySuspension } from './admin/adminApi'
 import { AdminPanel } from './admin/AdminPanel'
 import { useAdminStore } from './admin/adminStore'
 import { useAuthStore } from './auth/authStore'
@@ -36,6 +38,13 @@ function App() {
   const [pastIntro, setPastIntro] = useState(false)
   const [chapterIntroSeenFor, setChapterIntroSeenFor] = useState<number | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
+  // Moderation state for *this* account (migrations_014). Asked once per
+  // session; the database is what actually refuses a suspended player's
+  // writes, so this only decides whether to say so to their face.
+  const [suspension, setSuspension] = useState<{ suspended: boolean; reason: string | null }>({
+    suspended: false,
+    reason: null,
+  })
   // Bumped by the retry button to re-run the load effect.
   const [loadAttempt, setLoadAttempt] = useState(0)
   const { session, loading, passwordRecovery } = useAuthStore()
@@ -54,8 +63,17 @@ function App() {
   // accounts on the same page never carries the previous one's answer over.
   useEffect(() => {
     resetAdmin()
+    setSuspension({ suspended: false, reason: null })
     if (!session) return
     void checkAdmin()
+
+    let cancelled = false
+    fetchMySuspension().then((status) => {
+      if (!cancelled) setSuspension(status)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [session, checkAdmin, resetAdmin])
 
   useEffect(() => {
@@ -119,6 +137,11 @@ function App() {
     content = <StoryIntro onStart={() => setPastIntro(true)} />
     playMenuMusic = true
     showSoundToggle = true
+  } else if (suspension.suspended) {
+    // Ahead of every game screen, including the loading one: a suspended
+    // player should never see a dungeon they are not allowed to save in.
+    content = <SuspendedScreen reason={suspension.reason} />
+    playMenuMusic = true
   } else if (loadFailed) {
     content = <SaveLoadError onRetry={() => setLoadAttempt((n) => n + 1)} />
     playMenuMusic = true

@@ -21,6 +21,11 @@ export type AdminPlayerRow = {
   bestScore: number | null
   completedAt: string | null
   updatedAt: string | null
+  // Moderation state (migrations_014). suspendedAt non-null = the database is
+  // refusing every write from this account, whatever its client believes.
+  suspendedAt: string | null
+  suspendedReason: string | null
+  isAdmin: boolean
 }
 
 type OverviewRow = {
@@ -40,6 +45,9 @@ type OverviewRow = {
   best_score: number | null
   completed_at: string | null
   updated_at: string | null
+  suspended_at: string | null
+  suspended_reason: string | null
+  is_admin: boolean | null
 }
 
 // PostgREST's "no such function": migrations_012 has not been applied to this
@@ -91,5 +99,124 @@ export async function fetchAdminPlayers(): Promise<AdminPlayerRow[]> {
     bestScore: row.best_score,
     completedAt: row.completed_at,
     updatedAt: row.updated_at,
+    suspendedAt: row.suspended_at,
+    suspendedReason: row.suspended_reason,
+    isAdmin: row.is_admin === true,
   }))
+}
+
+// ---------------------------------------------------------------------------
+// เพิ่ม / แก้ไข / ลบ / ระงับ — the four admin actions (migrations_014).
+//
+// Every one of these is a SECURITY DEFINER RPC that re-checks is_admin() in
+// the database. These wrappers only turn a Postgres error into a sentence a
+// person can read: the RPC is what actually decides whether the action is
+// allowed, so a player calling them by hand gets a 403 and nothing else.
+// ---------------------------------------------------------------------------
+
+// The RPC raises with a Thai message for the cases an admin can actually hit
+// (duplicate email, too-short password, deleting yourself). Anything else is
+// a database problem and is reported as it came.
+function adminError(error: { code?: string; message: string }): Error {
+  if (error.code === MISSING_FUNCTION) {
+    return new Error('ยังไม่ได้ติดตั้งระบบจัดการผู้ใช้ — รัน supabase/migrations_014_admin_user_management.sql ก่อน')
+  }
+  if (error.code === '42501') return new Error('บัญชีนี้ไม่มีสิทธิ์แอดมิน')
+  // 23505 is a unique violation: a duplicate nickname or character name the
+  // RPC handed straight to Postgres.
+  if (error.code === '23505') return new Error(`ซ้ำกับของผู้เล่นคนอื่น: ${error.message}`)
+  return new Error(error.message)
+}
+
+export type NewPlayer = {
+  email: string
+  password: string
+  displayName?: string
+  nickname?: string
+}
+
+export async function adminCreatePlayer(player: NewPlayer): Promise<void> {
+  const { error } = await supabase.rpc('admin_create_player', {
+    p_email: player.email,
+    p_password: player.password,
+    p_display_name: player.displayName || null,
+    p_nickname: player.nickname || null,
+  })
+  if (error) throw adminError(error)
+}
+
+// Only the fields the admin actually filled in are sent; the RPC reads null
+// as "leave this one alone".
+export type PlayerEdit = {
+  displayName?: string | null
+  nickname?: string | null
+  characterName?: string | null
+  currentLevel?: number | null
+  playerHp?: number | null
+  attackPower?: number | null
+}
+
+export async function adminUpdatePlayer(userId: string, edit: PlayerEdit): Promise<void> {
+  const { error } = await supabase.rpc('admin_update_player', {
+    p_user_id: userId,
+    p_display_name: edit.displayName ?? null,
+    p_nickname: edit.nickname ?? null,
+    p_character_name: edit.characterName ?? null,
+    p_current_level: edit.currentLevel ?? null,
+    p_player_hp: edit.playerHp ?? null,
+    p_attack_power: edit.attackPower ?? null,
+  })
+  if (error) throw adminError(error)
+}
+
+export async function adminDeletePlayer(userId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_delete_player', { p_user_id: userId })
+  if (error) throw adminError(error)
+}
+
+export async function adminSetSuspended(userId: string, suspended: boolean, reason?: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_set_suspended', {
+    p_user_id: userId,
+    p_suspended: suspended,
+    p_reason: reason || null,
+  })
+  if (error) throw adminError(error)
+}
+
+export async function adminSetAdmin(email: string, isAdmin: boolean): Promise<void> {
+  const { error } = await supabase.rpc('admin_set_admin', { p_email: email, p_is_admin: isAdmin })
+  if (error) throw adminError(error)
+}
+
+// Password resets go through Supabase's own email flow rather than an RPC
+// that sets a password: the admin never gets to see or choose it, and the
+// link lands in the player's inbox. Same call the login screen's "forgot
+// password" uses, so it arrives on the same ResetPasswordScreen.
+export async function adminSendPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  })
+  if (error) throw new Error(error.message)
+}
+
+// Is *this* account suspended? Asked once per session alongside the save, and
+// again is not the security boundary — RLS is (migrations_014). This only
+// decides whether to show the player the "บัญชีถูกระงับ" screen instead of a
+// dungeon whose every write would silently fail.
+export async function fetchMySuspension(): Promise<{ suspended: boolean; reason: string | null }> {
+  const { data, error } = await supabase.auth.getUser()
+  const userId = data.user?.id
+  if (error || !userId) return { suspended: false, reason: null }
+
+  const { data: rows, error: readError } = await supabase
+    .from('profiles')
+    .select('suspended_at, suspended_reason')
+    .eq('id', userId)
+    .maybeSingle()
+
+  // A project without migrations_014 has no such column, which simply means
+  // nobody can be suspended yet.
+  if (readError) return { suspended: false, reason: null }
+  const row = rows as { suspended_at: string | null; suspended_reason: string | null } | null
+  return { suspended: row?.suspended_at != null, reason: row?.suspended_reason ?? null }
 }
