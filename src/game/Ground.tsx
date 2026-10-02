@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import type { Region, Wall } from './dungeon'
 import { WALL_HEIGHT } from './dungeon'
 import type { FloorPalette, LevelTheme, SurfaceGlow, WallPalette } from './levelTheme'
+import { startedOnCanvas } from './pointerSource'
 
 function TexturedFloorMaterial({ url, width, depth }: { url: string; width: number; depth: number }) {
   const texture = useTexture(url)
@@ -600,6 +601,12 @@ export function Ground({
                 // Only the nearest floor hit: a click crossing two slabs at a
                 // shared edge would otherwise fire twice.
                 e.stopPropagation()
+                // ...and only a click that landed on the dungeon itself. A
+                // pointerdown inside the spell console reaches r3f too (see
+                // startedOnCanvas), and raycasting it into the floor behind
+                // the panel is what used to send the player walking off in
+                // the middle of typing a spell.
+                if (!startedOnCanvas(e.nativeEvent.target)) return
                 onFloorClick(e.point.x, e.point.z)
               })
             }

@@ -103,10 +103,12 @@ export function Player({
       if (steppedZ) pos.z = nextZ
 
       // A click-walk that cannot move on either axis is wedged against
-      // something between it and the destination (the dungeon has corners a
-      // straight line does not solve). Give up rather than grinding into the
-      // wall forever — sliding along one is unaffected, since that still
-      // moves on one axis.
+      // something. Corners no longer end up here — the click is routed around
+      // the level's walls and props before the walk starts (pathfind.ts), and
+      // every leg of that route is a line the body has already been shown to
+      // fit down. What is left is the odd case the route could not know
+      // about, so give up rather than grinding into the wall forever;
+      // sliding along one is unaffected, since that still moves on one axis.
       if (!steppedX && !steppedZ) cancelClickMove()
 
       facing.current = Math.atan2(dir.current.x, dir.current.z)

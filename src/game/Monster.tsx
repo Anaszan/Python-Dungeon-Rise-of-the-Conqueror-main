@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { DoubleSide, LoopRepeat, type Group, type Mesh } from 'three'
 import { useGameStore } from './store'
 import { playerPosition } from './playerPosition'
+import { startedOnCanvas } from './pointerSource'
 import { distanceToPlayer } from './combat'
 import type { MonsterData } from './monsters'
 
@@ -244,6 +245,11 @@ export function Monster({ data }: { data: MonsterData }) {
         position={[0, 0.1 * scale, 0]}
         onPointerDown={(e) => {
           e.stopPropagation()
+          // A click inside the spell console is raycast into the scene too
+          // (see startedOnCanvas) — without this, typing in the code box
+          // could re-target whatever monster happened to be drawn behind the
+          // panel and throw away the spell being written.
+          if (!startedOnCanvas(e.nativeEvent.target)) return
           setTarget(data.id)
         }}
         onPointerOver={(e) => {

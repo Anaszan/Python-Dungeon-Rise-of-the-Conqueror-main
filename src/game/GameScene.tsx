@@ -12,6 +12,7 @@ import { TargetPanel } from './TargetPanel'
 import { FloatingHits } from './FloatingHits'
 import { playerPosition } from './playerPosition'
 import { cancelClickMove, clickMoveTarget, setClickMoveTarget } from './clickMove'
+import { findPath } from './pathfind'
 import { cycleTarget } from './combat'
 import { isTypingTarget } from './useKeyboardMap'
 import {
@@ -288,7 +289,21 @@ export function GameScene() {
           // quietly queue up a walk for whenever the screen clears.
           const state = useGameStore.getState()
           if (state.phase !== 'exploring' || state.paused) return
-          setClickMoveTarget(x, z)
+          // Routed around the walls and the solid props rather than aimed
+          // straight at the spot: the dungeon is full of corners a straight
+          // line cannot solve, and walking into one used to just cancel the
+          // walk. null means there is genuinely no way there — a click on the
+          // far side of a wall the level never opened — so nothing happens.
+          const route = findPath(
+            playerPosition.x,
+            playerPosition.z,
+            x,
+            z,
+            levelData.regions,
+            colliders,
+          )
+          if (!route) return
+          setClickMoveTarget(x, z, route)
         }}
       />
       <ClickMoveMarker />
