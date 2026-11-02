@@ -76,8 +76,16 @@ export function PlayerProfile() {
 
   return (
     <>
-      <button type="button" className="profile-toggle" onClick={() => (open ? close() : setOpen(true))}>
-        👤 โปรไฟล์
+      {/* See LogoutButton: the label is separable so a phone can show the
+          icon alone. */}
+      <button
+        type="button"
+        className="profile-toggle"
+        onClick={() => (open ? close() : setOpen(true))}
+        title="โปรไฟล์"
+        aria-label="โปรไฟล์"
+      >
+        👤<span className="hud-btn-label"> โปรไฟล์</span>
       </button>
       {open && (
         <div className="screen-overlay profile-overlay" onClick={close}>

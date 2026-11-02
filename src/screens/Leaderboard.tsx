@@ -20,8 +20,10 @@ export function Leaderboard() {
 
   return (
     <>
-      <button className="leaderboard-toggle" onClick={toggle}>
-        🏆 อันดับ
+      {/* See LogoutButton: the label is separable so a phone can show the
+          icon alone. */}
+      <button className="leaderboard-toggle" onClick={toggle} title="อันดับ" aria-label="อันดับ">
+        🏆<span className="hud-btn-label"> อันดับ</span>
       </button>
       {open && (
         <div className="screen-overlay leaderboard-overlay" onClick={toggle}>

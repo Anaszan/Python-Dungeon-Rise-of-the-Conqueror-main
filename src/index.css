@@ -460,6 +460,7 @@ canvas {
   body:has(.target-panel-collapsed) .pause-btn {
     bottom: calc(16px + 130px);
   }
+
 }
 
 .hp-bar-track {
@@ -3094,4 +3095,92 @@ canvas {
   font-size: 14px;
   line-height: 1.7;
   color: var(--parchment-text);
+}
+
+/* ── The top of the dungeon screen on a narrow window ──────────────────────
+   Four things are anchored up here and none of them knew about the others:
+   the HP card on the left (220px), three labelled buttons pinned at
+   16/150/300px from the right (~330px together), and the level banner
+   centred over the lot. Below about 1090px of window the banner reaches the
+   profile button; below about 640px it is on top of the HP card and two of
+   the buttons, and the buttons are on top of each other.
+
+   These live at the end of the stylesheet on purpose. A media query adds no
+   specificity, so a `.level-banner` rule inside one still loses to the plain
+   `.level-banner` rule further down the file — the overrides have to come
+   after the rules they override, not just inside a narrower query. */
+
+/* First thing to give way is the banner: it is the only one of the four that
+   is centred, so it is the only one whose position is a function of the
+   window's width. Out of the top row and onto a line of its own, where
+   nothing is competing for the space. */
+@media (max-width: 1090px) {
+  .level-banner {
+    top: calc(104px + env(safe-area-inset-top));
+    padding: 6px 20px;
+    max-width: calc(100vw - 20px);
+    border-top: 1px solid var(--gold-dim);
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  .level-banner-name {
+    /* A flex item will not ellipsis without this; the boss's name replaces
+       the counter and is the long one. */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* A phone has not got the width for three labelled buttons beside a 220px
+   card either, so the buttons drop to their icons (~38px each from ~110px)
+   and the card gives back what it is not using. */
+@media (max-width: 640px) {
+  .hud-btn-label {
+    display: none;
+  }
+
+  .leaderboard-toggle,
+  .logout-btn,
+  .profile-toggle {
+    top: calc(10px + env(safe-area-inset-top));
+    padding: 7px 10px;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  .leaderboard-toggle {
+    right: calc(10px + env(safe-area-inset-right));
+  }
+
+  .logout-btn {
+    right: calc(56px + env(safe-area-inset-right));
+  }
+
+  .profile-toggle {
+    right: calc(102px + env(safe-area-inset-right));
+  }
+
+  .player-hud {
+    top: calc(10px + env(safe-area-inset-top));
+    left: calc(10px + env(safe-area-inset-left));
+    width: 150px;
+    padding: 7px 10px;
+  }
+
+  /* The card is ~71px tall from a 10px top at this size, so the banner
+     tucks in just under it. */
+  .level-banner {
+    top: calc(88px + env(safe-area-inset-top));
+    gap: 8px;
+    padding: 5px 14px;
+    font-size: 12px;
+  }
+
+  .level-banner-progress,
+  .level-banner-boss {
+    padding: 1px 8px;
+    font-size: 11px;
+  }
 }
