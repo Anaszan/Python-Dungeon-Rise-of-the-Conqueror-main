@@ -1,33 +1,44 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DUNGEON_THEMES, MUSIC_RUMBLE_CUT_HZ } from './soundEngine'
 
-// The rule the music bus's high-pass only half enforces: the filter keeps the
-// sub-bass out of the mix, but a pad written below the cut would simply be
-// filtered into silence instead — a level with no pad at all. These are the
-// checks that a theme stays audible on the right side of that line.
-describe('no sub-bass drone under the music', () => {
+describe('background music', () => {
   it.each(DUNGEON_THEMES.map((theme, i) => [i + 1, theme] as const))(
-    'level %i keeps both pad oscillators above the cut',
+    'level %i plays its motif above the rumble cut',
     (_level, theme) => {
-      expect(theme.padRoot).toBeGreaterThanOrEqual(MUSIC_RUMBLE_CUT_HZ)
-      expect(theme.padRoot * theme.padRatio2).toBeGreaterThanOrEqual(MUSIC_RUMBLE_CUT_HZ)
-    },
-  )
-
-  it.each(DUNGEON_THEMES.map((theme, i) => [i + 1, theme] as const))(
-    'level %i leaves the pad its own fundamental to play',
-    (_level, theme) => {
-      // The pad's lowpass has to sit above its root, or the theme's two
-      // filters close on each other and the pad vanishes from both ends.
-      // Measured against the lowest point the LFO sweeps the corner down to.
-      expect(theme.padFilterFreq - theme.padLfoDepth).toBeGreaterThan(theme.padRoot * 0.5)
-    },
-  )
-
-  it.each(DUNGEON_THEMES.map((theme, i) => [i + 1, theme] as const))(
-    'level %i plays its motif above the cut',
-    (_level, theme) => {
+      // Below the cut the high-pass on the music bus would thin the lowest
+      // notes of the motif out of the melody rather than remove anything
+      // anybody wanted gone.
       expect(Math.min(...theme.scale)).toBeGreaterThanOrEqual(MUSIC_RUMBLE_CUT_HZ)
     },
   )
+
+  it.each(DUNGEON_THEMES.map((theme, i) => [i + 1, theme] as const))(
+    'level %i lets every note stop before it is struck again',
+    (_level, theme) => {
+      // Not a sustain rule in itself, but the thing that keeps the music from
+      // turning back into a drone by accident: if the decay is much longer
+      // than the step, notes stack on top of each other until the gaps
+      // between them disappear. Two notes deep is a tail; eight is a pad.
+      expect(theme.pluckDecay / theme.stepSeconds).toBeLessThan(3)
+    },
+  )
+
+  it('holds no voice open behind the music', () => {
+    // Every oscillator the music starts has to be a note with an end: one
+    // that is stopped at a time computed from when it began. A drone is an
+    // oscillator started with no stop, and that is exactly what used to run
+    // behind every screen in the game — a held pad per dungeon theme and
+    // another under the menu, which is the long "ooooo" this removed.
+    //
+    // Asserted against the source because the thing being forbidden is a
+    // shape of code, and the Web Audio API it would call does not exist in
+    // this test environment to spy on.
+    const source = readFileSync(new URL('./soundEngine.ts', import.meta.url), 'utf8')
+    const starts = source.match(/\.start\(/g) ?? []
+    const stops = source.match(/\.stop\(/g) ?? []
+
+    expect(starts.length).toBeGreaterThan(0)
+    expect(stops.length, 'an oscillator is started that is never stopped').toBe(starts.length)
+  })
 })

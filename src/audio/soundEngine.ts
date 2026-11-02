@@ -15,21 +15,16 @@ const SFX_VOLUME_KEY = 'pd-sfx-volume'
 const MUSIC_BASE_GAIN = 0.32
 const SFX_BASE_GAIN = 0.7
 
-// Where the music stops having any bass at all.
+// Where the music stops having any bass at all. The music bus and its echo
+// return both run through one high-pass here, set just under the lowest note
+// any theme plays (level 2's 98 Hz G2), as the floor nothing may fall
+// through: not the feedback delay stacking repeat on repeat into a rumble of
+// its own, not a theme someone writes later.
 //
-// Every theme used to hang a drone pad somewhere between 49 Hz and 138 Hz
-// under the melody, lowpassed to 220-900 Hz — which left the pad as almost
-// nothing but sub-bass. On headphones that is constant pressure under the
-// whole game, and on laptop speakers it is inaudible mud that only eats
-// headroom from the parts you can actually hear.
-//
-// The fix is in two halves. Every pad moved up an octave, onto the same root
-// its own melody already plays (see DUNGEON_THEMES), which is what takes the
-// rumble out. Then the music bus and its echo return both run through one
-// high-pass here, set just under the lowest note any theme plays (level 2's
-// 98 Hz G2), as the floor nothing may fall through afterwards: not the
-// sawtooth pads' filtered mush, not the feedback delay stacking repeat on
-// repeat, not a theme someone writes later.
+// This is what is left of the sub-bass problem. The drone pads that used to
+// sit between 49 Hz and 138 Hz under every melody are gone entirely now (see
+// DUNGEON_THEMES), so there is nothing down here to filter; the filter stays
+// as the guarantee that nothing comes back.
 //
 // Combat hits deliberately do not go through it — a thud is short enough to
 // read as impact rather than as a drone.
@@ -69,8 +64,8 @@ function ensureContext(): AudioContext {
   masterGain.connect(c.destination)
 
   // The one place the music's low end is cut (see MUSIC_RUMBLE_CUT_HZ).
-  // Everything musical goes through it — the pads, the plucks and the echo
-  // return — so nothing can route around it by accident later.
+  // Everything musical goes through it — the plucks and the echo return —
+  // so nothing can route around it by accident later.
   const rumbleCut = c.createBiquadFilter()
   rumbleCut.type = 'highpass'
   rumbleCut.frequency.value = MUSIC_RUMBLE_CUT_HZ
@@ -298,21 +293,17 @@ export function playPlayerHurt() {
 
 // ---------- background dungeon music ----------
 
-// One distinct theme per level (1-6, wraps if ever called with more) — each
-// a drone pad plus a plucked motif, so the dungeon doesn't loop the exact
-// same track from level 1 through level 6. Levels get progressively more
-// intense: slow/eerie early, energetic mid-game, dissonant and pulsing by
-// the final trap-filled level.
+// One distinct theme per level (1-6, wraps if ever called with more), so the
+// dungeon doesn't loop the exact same track from level 1 through level 6.
+// Levels get progressively more intense: slow/eerie early, energetic
+// mid-game, dissonant and pulsing by the final trap-filled level.
+//
+// A theme is now only its plucked motif — notes that are struck and decay.
+// Each one used to sit on a sustained two-oscillator drone pad underneath,
+// which is the held "ooooo" that ran behind the whole game and never stopped
+// for as long as a screen was open. It is gone: no voice in the music is
+// held any more, so between notes the background is actually quiet.
 type DungeonTheme = {
-  padRoot: number
-  padType1: OscillatorType
-  padType2: OscillatorType
-  padRatio2: number
-  padFilterFreq: number
-  padFilterQ: number
-  padLfoFreq: number
-  padLfoDepth: number
-  padPeak: number
   scale: number[]
   motif: number[]
   stepSeconds: number
@@ -323,29 +314,11 @@ type DungeonTheme = {
   pulseSteps?: number
 }
 
-// Every pad now sits an octave higher than it was first written, on the same
-// root its own `scale` starts from — a pad used to drone an octave *under*
-// the melody, which is where all the rumble lived. Each one's filter corner
-// and LFO depth doubled with it, so the pitch class, the beating between the
-// two oscillators and the shape of the filter's movement are all unchanged:
-// this is the same piece of music with its sub-bass taken away, not a
-// different one. The peaks came down to match, because the ear hears the
-// same pad as louder once it is out of the sub range.
-//
-// soundEngine.test.ts holds the line: no pad, and no note of any motif, may
-// be written back under MUSIC_RUMBLE_CUT_HZ.
+// soundEngine.test.ts holds the line: no note of any motif may be written
+// under MUSIC_RUMBLE_CUT_HZ, and no sustained voice may come back.
 export const DUNGEON_THEMES: DungeonTheme[] = [
   // Level 1 — ทางเดินมืด: slow minor-pentatonic corridor crawl.
   {
-    padRoot: 110, // A2 (was 55 = A1)
-    padType1: 'sine',
-    padType2: 'sawtooth',
-    padRatio2: 1.0073,
-    padFilterFreq: 600,
-    padFilterQ: 0.7,
-    padLfoFreq: 0.07,
-    padLfoDepth: 240,
-    padPeak: 0.4,
     scale: [110.0, 130.81, 146.83, 164.81, 196.0, 220.0],
     motif: [0, 3, 0, 2, 0, 3, 4, 3, 0, 2, 0, 3, 5, 4, 3, 2],
     stepSeconds: 0.42,
@@ -356,15 +329,6 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
   },
   // Level 2 — ห้องใต้ดินที่ลึกกว่าเดิม: lower, grittier, heavier.
   {
-    padRoot: 98.0, // G2 (was 49 = G1) — the lowest note left in the game
-    padType1: 'sine',
-    padType2: 'square',
-    padRatio2: 1.01,
-    padFilterFreq: 440,
-    padFilterQ: 0.8,
-    padLfoFreq: 0.05,
-    padLfoDepth: 180,
-    padPeak: 0.44,
     scale: [98.0, 116.54, 130.81, 146.83, 174.61, 196.0],
     motif: [0, 2, 0, 3, 0, 2, 4, 3, 0, 2, 0, 3, 5, 4, 2, 0],
     stepSeconds: 0.5,
@@ -375,15 +339,6 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
   },
   // Level 3 — สนามประลองคอมโบ: faster, brighter, no echo (punchier).
   {
-    padRoot: 164.81, // E3 (was 82.41 = E2)
-    padType1: 'sine',
-    padType2: 'triangle',
-    padRatio2: 1.5,
-    padFilterFreq: 1100,
-    padFilterQ: 0.6,
-    padLfoFreq: 0.18,
-    padLfoDepth: 320,
-    padPeak: 0.36,
     scale: [164.81, 184.997, 195.998, 220.0, 246.94, 277.18],
     motif: [0, 2, 4, 2, 5, 4, 2, 3, 0, 2, 4, 3, 5, 4, 2, 0],
     stepSeconds: 0.26,
@@ -394,15 +349,6 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
   },
   // Level 4 — หอคาถาต้องมนตร์: arcane, shimmering, wide sparkling register.
   {
-    padRoot: 277.18, // C#4 (was 138.59 = C#3)
-    padType1: 'sine',
-    padType2: 'sine',
-    padRatio2: 1.498,
-    padFilterFreq: 1800,
-    padFilterQ: 0.5,
-    padLfoFreq: 0.3,
-    padLfoDepth: 500,
-    padPeak: 0.32,
     scale: [277.18, 311.13, 349.23, 392.0, 440.0, 493.88],
     motif: [0, 2, 4, 5, 3, 1, 0, 4, 2, 5, 3, 0, 4, 1, 2, 5],
     stepSeconds: 0.32,
@@ -413,15 +359,6 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
   },
   // Level 5 — หอสมุดลับ: calm, mysterious dorian mode, slow.
   {
-    padRoot: 146.83, // D3 (was 73.42 = D2)
-    padType1: 'sine',
-    padType2: 'triangle',
-    padRatio2: 1.1892,
-    padFilterFreq: 520,
-    padFilterQ: 0.6,
-    padLfoFreq: 0.06,
-    padLfoDepth: 200,
-    padPeak: 0.38,
     scale: [146.83, 164.81, 174.61, 196.0, 220.0, 246.94],
     motif: [0, 1, 3, 1, 4, 3, 1, 2, 0, 1, 3, 2, 5, 4, 3, 1],
     stepSeconds: 0.48,
@@ -430,18 +367,9 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
     pluckDecay: 1.0,
     useDelay: true,
   },
-  // Level 6 — ดันเจี้ยนกับดักมรณะ: dissonant tritone pad, fast, with a
-  // dread pulse under the motif.
+  // Level 6 — ดันเจี้ยนกับดักมรณะ: dissonant, fast, with a dread pulse
+  // under the motif.
   {
-    padRoot: 185.0, // F#3 (was 92.5 = F#2)
-    padType1: 'sawtooth',
-    padType2: 'square',
-    padRatio2: 1.4142,
-    padFilterFreq: 1400,
-    padFilterQ: 1.2,
-    padLfoFreq: 0.4,
-    padLfoDepth: 600,
-    padPeak: 0.36,
     scale: [185.0, 196.0, 220.0, 233.08, 277.18, 311.13],
     motif: [0, 1, 0, 2, 0, 1, 3, 2, 0, 1, 0, 2, 4, 3, 2, 1],
     stepSeconds: 0.22,
@@ -454,10 +382,6 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
 ]
 
 let musicRunToken = 0
-let padOsc1: OscillatorNode | null = null
-let padOsc2: OscillatorNode | null = null
-let padGain: GainNode | null = null
-let padLfo: OscillatorNode | null = null
 
 function pluck(c: AudioContext, freq: number, theme: DungeonTheme) {
   if (!musicBus) return
@@ -500,81 +424,35 @@ function scheduleMusicStep(token: number, step: number, theme: DungeonTheme) {
 export function startDungeonMusic(level = 1) {
   if (musicRunToken !== 0) return
   const theme = DUNGEON_THEMES[(Math.max(1, level) - 1) % DUNGEON_THEMES.length]
-  const c = ensureContext()
   const token = ++musicRunToken
-
-  padOsc1 = c.createOscillator()
-  padOsc1.type = theme.padType1
-  padOsc1.frequency.value = theme.padRoot
-  padOsc2 = c.createOscillator()
-  padOsc2.type = theme.padType2
-  padOsc2.frequency.value = theme.padRoot * theme.padRatio2
-
-  const padFilter = c.createBiquadFilter()
-  padFilter.type = 'lowpass'
-  padFilter.frequency.value = theme.padFilterFreq
-  padFilter.Q.value = theme.padFilterQ
-
-  padLfo = c.createOscillator()
-  padLfo.frequency.value = theme.padLfoFreq
-  const lfoGain = c.createGain()
-  lfoGain.gain.value = theme.padLfoDepth
-  padLfo.connect(lfoGain)
-  lfoGain.connect(padFilter.frequency)
-
-  padGain = c.createGain()
-  padGain.gain.setValueAtTime(0, c.currentTime)
-  padGain.gain.linearRampToValueAtTime(theme.padPeak, c.currentTime + 2.5)
-
-  padOsc1.connect(padFilter)
-  padOsc2.connect(padFilter)
-  padFilter.connect(padGain)
-  padGain.connect(musicBus!)
-
-  padOsc1.start()
-  padOsc2.start()
-  padLfo.start()
-
   scheduleMusicStep(token, 0, theme)
 }
 
+// Stopping is just "schedule no more notes". There is no sustained voice left
+// to fade out: whatever was struck last rings down its own decay (up to a
+// second on the slow levels), which is the fade.
 export function stopDungeonMusic() {
-  if (musicRunToken === 0) return
   musicRunToken = 0
-  const c = ctx
-  if (c && padGain) {
-    const t0 = c.currentTime
-    padGain.gain.cancelScheduledValues(t0)
-    padGain.gain.setValueAtTime(padGain.gain.value, t0)
-    padGain.gain.linearRampToValueAtTime(0, t0 + 1)
-  }
-  if (c) {
-    padOsc1?.stop(c.currentTime + 1.1)
-    padOsc2?.stop(c.currentTime + 1.1)
-    padLfo?.stop(c.currentTime + 1.1)
-  }
-  padOsc1 = null
-  padOsc2 = null
-  padLfo = null
-  padGain = null
 }
 
 // ---------- background menu music (landing / login / pre-game screens) ----------
 
-// A bright C-major pentatonic arpeggio over a soft major-third pad — used on
-// the landing page, login/register, and every screen between login and the
-// dungeon (story intro, character pick, chapter briefing). Deliberately
-// cheerier, brighter, and faster than the dungeon's minor drone, and skips
-// the dungeon's echo send so it stays crisp.
+// A bright C-major pentatonic arpeggio — used on the landing page,
+// login/register, and every screen between login and the dungeon (story
+// intro, character pick, chapter briefing). Deliberately cheerier, brighter
+// and faster than the dungeon themes, and skips their echo send so it stays
+// crisp.
+//
+// It had a held C4+E4 pad under it until the same pass that took the
+// dungeon's pads out. That one was the worst of them to sit with, because
+// these are the screens a player reads on: the character picker and the
+// chapter briefing are places you stay for a minute, with a tone held
+// through the whole minute. Now the arpeggio plays over silence.
 const MENU_SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5]
 const MENU_MOTIF = [0, 2, 4, 2, 5, 4, 2, 3, 0, 2, 4, 3, 2, 4, 5, 3]
 const MENU_STEP_SECONDS = 0.26
 
 let menuRunToken = 0
-let menuPadOsc1: OscillatorNode | null = null
-let menuPadOsc2: OscillatorNode | null = null
-let menuPadGain: GainNode | null = null
-let menuPadLfo: OscillatorNode | null = null
 
 function menuPluck(c: AudioContext, freq: number) {
   if (!musicBus) return
@@ -603,61 +481,10 @@ function scheduleMenuStep(token: number, step: number) {
 
 export function startMenuMusic() {
   if (menuRunToken !== 0) return
-  const c = ensureContext()
   const token = ++menuRunToken
-
-  menuPadOsc1 = c.createOscillator()
-  menuPadOsc1.type = 'sine'
-  menuPadOsc1.frequency.value = 261.63 // C4
-  menuPadOsc2 = c.createOscillator()
-  menuPadOsc2.type = 'sine'
-  menuPadOsc2.frequency.value = 329.63 // E4 — major third above, keeps the pad bright
-
-  const padFilter = c.createBiquadFilter()
-  padFilter.type = 'lowpass'
-  padFilter.frequency.value = 1400
-  padFilter.Q.value = 0.5
-
-  menuPadLfo = c.createOscillator()
-  menuPadLfo.frequency.value = 0.15
-  const lfoGain = c.createGain()
-  lfoGain.gain.value = 200
-  menuPadLfo.connect(lfoGain)
-  lfoGain.connect(padFilter.frequency)
-
-  menuPadGain = c.createGain()
-  menuPadGain.gain.setValueAtTime(0, c.currentTime)
-  menuPadGain.gain.linearRampToValueAtTime(0.22, c.currentTime + 1.5)
-
-  menuPadOsc1.connect(padFilter)
-  menuPadOsc2.connect(padFilter)
-  padFilter.connect(menuPadGain)
-  menuPadGain.connect(musicBus!)
-
-  menuPadOsc1.start()
-  menuPadOsc2.start()
-  menuPadLfo.start()
-
   scheduleMenuStep(token, 0)
 }
 
 export function stopMenuMusic() {
-  if (menuRunToken === 0) return
   menuRunToken = 0
-  const c = ctx
-  if (c && menuPadGain) {
-    const t0 = c.currentTime
-    menuPadGain.gain.cancelScheduledValues(t0)
-    menuPadGain.gain.setValueAtTime(menuPadGain.gain.value, t0)
-    menuPadGain.gain.linearRampToValueAtTime(0, t0 + 0.6)
-  }
-  if (c) {
-    menuPadOsc1?.stop(c.currentTime + 0.7)
-    menuPadOsc2?.stop(c.currentTime + 0.7)
-    menuPadLfo?.stop(c.currentTime + 0.7)
-  }
-  menuPadOsc1 = null
-  menuPadOsc2 = null
-  menuPadLfo = null
-  menuPadGain = null
 }
