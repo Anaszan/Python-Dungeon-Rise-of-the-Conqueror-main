@@ -15,11 +15,10 @@ const SFX_VOLUME_KEY = 'pd-sfx-volume'
 const MUSIC_BASE_GAIN = 0.32
 const SFX_BASE_GAIN = 0.7
 
-// Where the music stops having any bass at all. The music bus and its echo
-// return both run through one high-pass here, set just under the lowest note
-// any theme plays (level 2's 98 Hz G2), as the floor nothing may fall
-// through: not the feedback delay stacking repeat on repeat into a rumble of
-// its own, not a theme someone writes later.
+// Where the music stops having any bass at all. The music bus runs through
+// one high-pass here, set just under the lowest note any theme plays (level
+// 2's 98 Hz G2), as the floor nothing may fall through — including a theme
+// someone writes later.
 //
 // This is what is left of the sub-bass problem. The drone pads that used to
 // sit between 49 Hz and 138 Hz under every melody are gone entirely now (see
@@ -34,7 +33,6 @@ let ctx: AudioContext | null = null
 let masterGain: GainNode | null = null
 let musicBus: GainNode | null = null
 let sfxBus: GainNode | null = null
-let delaySend: DelayNode | null = null
 let noiseBuffer: AudioBuffer | null = null
 
 let muted = typeof localStorage !== 'undefined' && localStorage.getItem(MUTE_KEY) === '1'
@@ -64,8 +62,8 @@ function ensureContext(): AudioContext {
   masterGain.connect(c.destination)
 
   // The one place the music's low end is cut (see MUSIC_RUMBLE_CUT_HZ).
-  // Everything musical goes through it — the plucks and the echo return —
-  // so nothing can route around it by accident later.
+  // Everything musical goes through it, so nothing can route around it by
+  // accident later.
   const rumbleCut = c.createBiquadFilter()
   rumbleCut.type = 'highpass'
   rumbleCut.frequency.value = MUSIC_RUMBLE_CUT_HZ
@@ -81,23 +79,11 @@ function ensureContext(): AudioContext {
   sfxBus.gain.value = SFX_BASE_GAIN * sfxVolume
   sfxBus.connect(masterGain)
 
-  // A short feedback delay on the music bus only, for a "stone hallway"
-  // echo behind the walking motif — never applied to combat SFX.
-  const delay = c.createDelay(1)
-  delay.delayTime.value = 0.32
-  const feedback = c.createGain()
-  feedback.gain.value = 0.32
-  const wet = c.createGain()
-  wet.gain.value = 0.22
-  delay.connect(feedback)
-  feedback.connect(delay)
-  delay.connect(wet)
-  // Through the high-pass as well, not straight to master: a feedback delay
-  // is exactly the thing that would otherwise stack repeat on repeat into a
-  // low rumble of its own.
-  wet.connect(rumbleCut)
-  delaySend = delay
-
+  // There used to be a feedback delay here, feeding a "stone hallway" echo
+  // back into itself behind the music. It is gone with the pads: a note into
+  // a 0.32s delay at 0.32 feedback comes back three or four more times over
+  // the second that follows, so every note trailed off into a smear — the
+  // drawn-out tail after each pluck. A note now plays once and stops.
   return c
 }
 
@@ -309,8 +295,13 @@ type DungeonTheme = {
   stepSeconds: number
   pluckType: OscillatorType
   pluckPeak: number
+  // How long a note takes to fall silent. Kept well under `stepSeconds` on
+  // purpose, and soundEngine.test.ts enforces it: a decay longer than the
+  // gap between notes means every note is still sounding when the next one
+  // is struck, which is what made each pluck trail off into a drawn-out
+  // tone instead of ending. Short enough and the music reads as notes; long
+  // enough and it is a drone again by another name.
   pluckDecay: number
-  useDelay: boolean
   pulseSteps?: number
 }
 
@@ -324,8 +315,7 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
     stepSeconds: 0.42,
     pluckType: 'triangle',
     pluckPeak: 0.26,
-    pluckDecay: 0.9,
-    useDelay: true,
+    pluckDecay: 0.24,
   },
   // Level 2 — ห้องใต้ดินที่ลึกกว่าเดิม: lower, grittier, heavier.
   {
@@ -334,18 +324,16 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
     stepSeconds: 0.5,
     pluckType: 'triangle',
     pluckPeak: 0.24,
-    pluckDecay: 1.0,
-    useDelay: true,
+    pluckDecay: 0.28,
   },
-  // Level 3 — สนามประลองคอมโบ: faster, brighter, no echo (punchier).
+  // Level 3 — สนามประลองคอมโบ: faster, brighter, punchier.
   {
     scale: [164.81, 184.997, 195.998, 220.0, 246.94, 277.18],
     motif: [0, 2, 4, 2, 5, 4, 2, 3, 0, 2, 4, 3, 5, 4, 2, 0],
     stepSeconds: 0.26,
     pluckType: 'square',
     pluckPeak: 0.18,
-    pluckDecay: 0.45,
-    useDelay: false,
+    pluckDecay: 0.15,
   },
   // Level 4 — หอคาถาต้องมนตร์: arcane, shimmering, wide sparkling register.
   {
@@ -354,8 +342,7 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
     stepSeconds: 0.32,
     pluckType: 'sine',
     pluckPeak: 0.28,
-    pluckDecay: 0.7,
-    useDelay: true,
+    pluckDecay: 0.19,
   },
   // Level 5 — หอสมุดลับ: calm, mysterious dorian mode, slow.
   {
@@ -364,8 +351,7 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
     stepSeconds: 0.48,
     pluckType: 'triangle',
     pluckPeak: 0.22,
-    pluckDecay: 1.0,
-    useDelay: true,
+    pluckDecay: 0.27,
   },
   // Level 6 — ดันเจี้ยนกับดักมรณะ: dissonant, fast, with a dread pulse
   // under the motif.
@@ -375,8 +361,7 @@ export const DUNGEON_THEMES: DungeonTheme[] = [
     stepSeconds: 0.22,
     pluckType: 'sawtooth',
     pluckPeak: 0.22,
-    pluckDecay: 0.4,
-    useDelay: false,
+    pluckDecay: 0.13,
     pulseSteps: 4,
   },
 ]
@@ -397,9 +382,8 @@ function pluck(c: AudioContext, freq: number, theme: DungeonTheme) {
 
   osc.connect(gain)
   gain.connect(musicBus)
-  if (theme.useDelay && delaySend) gain.connect(delaySend)
   osc.start(t0)
-  osc.stop(t0 + theme.pluckDecay + 0.1)
+  osc.stop(t0 + theme.pluckDecay + 0.05)
 }
 
 // Level 6's dread pulse. It used to sweep 70 → 38 Hz, entirely below
@@ -428,9 +412,9 @@ export function startDungeonMusic(level = 1) {
   scheduleMusicStep(token, 0, theme)
 }
 
-// Stopping is just "schedule no more notes". There is no sustained voice left
-// to fade out: whatever was struck last rings down its own decay (up to a
-// second on the slow levels), which is the fade.
+// Stopping is just "schedule no more notes". There is no sustained voice and
+// no echo left to fade out: the last note falls silent inside a third of a
+// second on its own.
 export function stopDungeonMusic() {
   musicRunToken = 0
 }
@@ -440,17 +424,19 @@ export function stopDungeonMusic() {
 // A bright C-major pentatonic arpeggio — used on the landing page,
 // login/register, and every screen between login and the dungeon (story
 // intro, character pick, chapter briefing). Deliberately cheerier, brighter
-// and faster than the dungeon themes, and skips their echo send so it stays
-// crisp.
+// and faster than the dungeon themes.
 //
-// It had a held C4+E4 pad under it until the same pass that took the
-// dungeon's pads out. That one was the worst of them to sit with, because
-// these are the screens a player reads on: the character picker and the
-// chapter briefing are places you stay for a minute, with a tone held
-// through the whole minute. Now the arpeggio plays over silence.
+// It had a held C4+E4 pad under it, and notes that rang for 0.5s against a
+// 0.26s step so each one was still sounding through the next two. Both are
+// gone. These are the screens a player sits and reads on — the character
+// picker and the chapter briefing are places you stay for a minute — so
+// they are the worst place in the game for a sound that never lets go.
 const MENU_SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5]
 const MENU_MOTIF = [0, 2, 4, 2, 5, 4, 2, 3, 0, 2, 4, 3, 2, 4, 5, 3]
 const MENU_STEP_SECONDS = 0.26
+// Same rule as the dungeon's pluckDecay: comfortably shorter than the step,
+// so one note is done before the next begins.
+const MENU_PLUCK_DECAY = 0.16
 
 let menuRunToken = 0
 
@@ -464,12 +450,12 @@ function menuPluck(c: AudioContext, freq: number) {
   const gain = c.createGain()
   gain.gain.setValueAtTime(0, t0)
   gain.gain.linearRampToValueAtTime(0.28, t0 + 0.008)
-  gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5)
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + MENU_PLUCK_DECAY)
 
   osc.connect(gain)
   gain.connect(musicBus)
   osc.start(t0)
-  osc.stop(t0 + 0.55)
+  osc.stop(t0 + MENU_PLUCK_DECAY + 0.05)
 }
 
 function scheduleMenuStep(token: number, step: number) {

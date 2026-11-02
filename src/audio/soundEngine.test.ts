@@ -14,15 +14,25 @@ describe('background music', () => {
   )
 
   it.each(DUNGEON_THEMES.map((theme, i) => [i + 1, theme] as const))(
-    'level %i lets every note stop before it is struck again',
+    'level %i finishes each note before playing the next',
     (_level, theme) => {
-      // Not a sustain rule in itself, but the thing that keeps the music from
-      // turning back into a drone by accident: if the decay is much longer
-      // than the step, notes stack on top of each other until the gaps
-      // between them disappear. Two notes deep is a tail; eight is a pad.
-      expect(theme.pluckDecay / theme.stepSeconds).toBeLessThan(3)
+      // The rule that keeps the music from becoming a drone by another name.
+      // A decay longer than the step means every note is still sounding when
+      // the next is struck, and the notes pile up into one continuous tone —
+      // which is exactly what the long tail after each pluck was. Under 1
+      // and the music is notes with silence between them.
+      expect(theme.pluckDecay).toBeLessThan(theme.stepSeconds)
     },
   )
+
+  it('sends nothing into a feedback loop', () => {
+    // A delay feeding itself turns one note into four over the second that
+    // follows it, which is the same drawn-out tail arriving by a different
+    // route. The music has no echo send at all now.
+    const source = readFileSync(new URL('./soundEngine.ts', import.meta.url), 'utf8')
+
+    expect(source).not.toMatch(/createDelay/)
+  })
 
   it('holds no voice open behind the music', () => {
     // Every oscillator the music starts has to be a note with an end: one
