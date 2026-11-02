@@ -1916,6 +1916,58 @@ canvas {
   margin-bottom: 20px;
 }
 
+/* The appearance picker's own two-column split.
+   Measured against this element's width rather than the viewport's, because
+   the same picker is used in two very differently sized places: the
+   full-width customize screen and the narrow profile panel. A viewport media
+   query would put the profile panel into two columns on a desktop too, where
+   it has nothing like the room. */
+.appearance-picker {
+  container-type: inline-size;
+}
+
+.appearance-layout {
+  display: grid;
+  gap: 20px;
+}
+
+.appearance-preview-hint {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: var(--parchment-dim);
+  text-align: center;
+}
+
+@container (min-width: 620px) {
+  /* Options on the left, character on the right. The right column is capped
+     so a very wide screen grows the options rather than the portrait. */
+  .appearance-layout {
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 32%, 340px);
+    align-items: start;
+  }
+
+  .appearance-controls {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .appearance-preview {
+    grid-column: 2;
+    grid-row: 1;
+    /* Stays in view while the options scroll past it — the whole point of
+       the preview is watching it change as you pick. */
+    position: sticky;
+    top: 16px;
+  }
+
+  .appearance-preview .customize-preview {
+    /* Tall rather than wide: a standing character is a portrait, and the
+       camera's vertical field of view is what decides how big they read. */
+    height: clamp(340px, 44vh, 520px);
+    margin-bottom: 8px;
+  }
+}
+
 .customize-section {
   text-align: left;
   margin-bottom: 16px;

@@ -15,6 +15,26 @@ const SFX_VOLUME_KEY = 'pd-sfx-volume'
 const MUSIC_BASE_GAIN = 0.32
 const SFX_BASE_GAIN = 0.7
 
+// Where the music stops having any bass at all.
+//
+// Every theme used to hang a drone pad somewhere between 49 Hz and 138 Hz
+// under the melody, lowpassed to 220-900 Hz — which left the pad as almost
+// nothing but sub-bass. On headphones that is constant pressure under the
+// whole game, and on laptop speakers it is inaudible mud that only eats
+// headroom from the parts you can actually hear.
+//
+// The fix is in two halves. Every pad moved up an octave, onto the same root
+// its own melody already plays (see DUNGEON_THEMES), which is what takes the
+// rumble out. Then the music bus and its echo return both run through one
+// high-pass here, set just under the lowest note any theme plays (level 2's
+// 98 Hz G2), as the floor nothing may fall through afterwards: not the
+// sawtooth pads' filtered mush, not the feedback delay stacking repeat on
+// repeat, not a theme someone writes later.
+//
+// Combat hits deliberately do not go through it — a thud is short enough to
+// read as impact rather than as a drone.
+export const MUSIC_RUMBLE_CUT_HZ = 90
+
 let ctx: AudioContext | null = null
 let masterGain: GainNode | null = null
 let musicBus: GainNode | null = null
@@ -48,9 +68,19 @@ function ensureContext(): AudioContext {
   masterGain.gain.value = muted ? 0 : 1
   masterGain.connect(c.destination)
 
+  // The one place the music's low end is cut (see MUSIC_RUMBLE_CUT_HZ).
+  // Everything musical goes through it — the pads, the plucks and the echo
+  // return — so nothing can route around it by accident later.
+  const rumbleCut = c.createBiquadFilter()
+  rumbleCut.type = 'highpass'
+  rumbleCut.frequency.value = MUSIC_RUMBLE_CUT_HZ
+  // Flat: a resonant corner would put back a hump right where the rumble was.
+  rumbleCut.Q.value = 0.707
+  rumbleCut.connect(masterGain)
+
   musicBus = c.createGain()
   musicBus.gain.value = MUSIC_BASE_GAIN * musicVolume
-  musicBus.connect(masterGain)
+  musicBus.connect(rumbleCut)
 
   sfxBus = c.createGain()
   sfxBus.gain.value = SFX_BASE_GAIN * sfxVolume
@@ -67,7 +97,10 @@ function ensureContext(): AudioContext {
   delay.connect(feedback)
   feedback.connect(delay)
   delay.connect(wet)
-  wet.connect(masterGain)
+  // Through the high-pass as well, not straight to master: a feedback delay
+  // is exactly the thing that would otherwise stack repeat on repeat into a
+  // low rumble of its own.
+  wet.connect(rumbleCut)
   delaySend = delay
 
   return c
@@ -290,18 +323,29 @@ type DungeonTheme = {
   pulseSteps?: number
 }
 
-const DUNGEON_THEMES: DungeonTheme[] = [
+// Every pad now sits an octave higher than it was first written, on the same
+// root its own `scale` starts from — a pad used to drone an octave *under*
+// the melody, which is where all the rumble lived. Each one's filter corner
+// and LFO depth doubled with it, so the pitch class, the beating between the
+// two oscillators and the shape of the filter's movement are all unchanged:
+// this is the same piece of music with its sub-bass taken away, not a
+// different one. The peaks came down to match, because the ear hears the
+// same pad as louder once it is out of the sub range.
+//
+// soundEngine.test.ts holds the line: no pad, and no note of any motif, may
+// be written back under MUSIC_RUMBLE_CUT_HZ.
+export const DUNGEON_THEMES: DungeonTheme[] = [
   // Level 1 — ทางเดินมืด: slow minor-pentatonic corridor crawl.
   {
-    padRoot: 55,
+    padRoot: 110, // A2 (was 55 = A1)
     padType1: 'sine',
     padType2: 'sawtooth',
     padRatio2: 1.0073,
-    padFilterFreq: 300,
+    padFilterFreq: 600,
     padFilterQ: 0.7,
     padLfoFreq: 0.07,
-    padLfoDepth: 120,
-    padPeak: 0.55,
+    padLfoDepth: 240,
+    padPeak: 0.4,
     scale: [110.0, 130.81, 146.83, 164.81, 196.0, 220.0],
     motif: [0, 3, 0, 2, 0, 3, 4, 3, 0, 2, 0, 3, 5, 4, 3, 2],
     stepSeconds: 0.42,
@@ -312,15 +356,15 @@ const DUNGEON_THEMES: DungeonTheme[] = [
   },
   // Level 2 — ห้องใต้ดินที่ลึกกว่าเดิม: lower, grittier, heavier.
   {
-    padRoot: 49.0,
+    padRoot: 98.0, // G2 (was 49 = G1) — the lowest note left in the game
     padType1: 'sine',
     padType2: 'square',
     padRatio2: 1.01,
-    padFilterFreq: 220,
+    padFilterFreq: 440,
     padFilterQ: 0.8,
     padLfoFreq: 0.05,
-    padLfoDepth: 90,
-    padPeak: 0.6,
+    padLfoDepth: 180,
+    padPeak: 0.44,
     scale: [98.0, 116.54, 130.81, 146.83, 174.61, 196.0],
     motif: [0, 2, 0, 3, 0, 2, 4, 3, 0, 2, 0, 3, 5, 4, 2, 0],
     stepSeconds: 0.5,
@@ -331,15 +375,15 @@ const DUNGEON_THEMES: DungeonTheme[] = [
   },
   // Level 3 — สนามประลองคอมโบ: faster, brighter, no echo (punchier).
   {
-    padRoot: 82.41,
+    padRoot: 164.81, // E3 (was 82.41 = E2)
     padType1: 'sine',
     padType2: 'triangle',
     padRatio2: 1.5,
-    padFilterFreq: 550,
+    padFilterFreq: 1100,
     padFilterQ: 0.6,
     padLfoFreq: 0.18,
-    padLfoDepth: 160,
-    padPeak: 0.48,
+    padLfoDepth: 320,
+    padPeak: 0.36,
     scale: [164.81, 184.997, 195.998, 220.0, 246.94, 277.18],
     motif: [0, 2, 4, 2, 5, 4, 2, 3, 0, 2, 4, 3, 5, 4, 2, 0],
     stepSeconds: 0.26,
@@ -350,15 +394,15 @@ const DUNGEON_THEMES: DungeonTheme[] = [
   },
   // Level 4 — หอคาถาต้องมนตร์: arcane, shimmering, wide sparkling register.
   {
-    padRoot: 138.59,
+    padRoot: 277.18, // C#4 (was 138.59 = C#3)
     padType1: 'sine',
     padType2: 'sine',
     padRatio2: 1.498,
-    padFilterFreq: 900,
+    padFilterFreq: 1800,
     padFilterQ: 0.5,
     padLfoFreq: 0.3,
-    padLfoDepth: 250,
-    padPeak: 0.42,
+    padLfoDepth: 500,
+    padPeak: 0.32,
     scale: [277.18, 311.13, 349.23, 392.0, 440.0, 493.88],
     motif: [0, 2, 4, 5, 3, 1, 0, 4, 2, 5, 3, 0, 4, 1, 2, 5],
     stepSeconds: 0.32,
@@ -369,15 +413,15 @@ const DUNGEON_THEMES: DungeonTheme[] = [
   },
   // Level 5 — หอสมุดลับ: calm, mysterious dorian mode, slow.
   {
-    padRoot: 73.42,
+    padRoot: 146.83, // D3 (was 73.42 = D2)
     padType1: 'sine',
     padType2: 'triangle',
     padRatio2: 1.1892,
-    padFilterFreq: 260,
+    padFilterFreq: 520,
     padFilterQ: 0.6,
     padLfoFreq: 0.06,
-    padLfoDepth: 100,
-    padPeak: 0.5,
+    padLfoDepth: 200,
+    padPeak: 0.38,
     scale: [146.83, 164.81, 174.61, 196.0, 220.0, 246.94],
     motif: [0, 1, 3, 1, 4, 3, 1, 2, 0, 1, 3, 2, 5, 4, 3, 1],
     stepSeconds: 0.48,
@@ -387,17 +431,17 @@ const DUNGEON_THEMES: DungeonTheme[] = [
     useDelay: true,
   },
   // Level 6 — ดันเจี้ยนกับดักมรณะ: dissonant tritone pad, fast, with a
-  // dread heartbeat pulse under the motif.
+  // dread pulse under the motif.
   {
-    padRoot: 92.5,
+    padRoot: 185.0, // F#3 (was 92.5 = F#2)
     padType1: 'sawtooth',
     padType2: 'square',
     padRatio2: 1.4142,
-    padFilterFreq: 700,
+    padFilterFreq: 1400,
     padFilterQ: 1.2,
     padLfoFreq: 0.4,
-    padLfoDepth: 300,
-    padPeak: 0.5,
+    padLfoDepth: 600,
+    padPeak: 0.36,
     scale: [185.0, 196.0, 220.0, 233.08, 277.18, 311.13],
     motif: [0, 1, 0, 2, 0, 1, 3, 2, 0, 1, 0, 2, 4, 3, 2, 1],
     stepSeconds: 0.22,
@@ -434,16 +478,22 @@ function pluck(c: AudioContext, freq: number, theme: DungeonTheme) {
   osc.stop(t0 + theme.pluckDecay + 0.1)
 }
 
-function heartbeatPulse(c: AudioContext) {
+// Level 6's dread pulse. It used to sweep 70 → 38 Hz, entirely below
+// MUSIC_RUMBLE_CUT_HZ — the high-pass would have swallowed it whole and left
+// every fourth step of that level silent. Rewritten an octave up as a short
+// dry thud, with a noise tick on the front so it still lands as a hit rather
+// than a hum: same job, nothing in the sub range.
+function dreadPulse(c: AudioContext) {
   if (!musicBus) return
-  tone(c, musicBus, { freq: 70, type: 'sine', duration: 0.35, peak: 0.32, freqEnd: 38 })
+  tone(c, musicBus, { freq: 150, type: 'triangle', duration: 0.3, peak: 0.3, freqEnd: 100 })
+  noiseBurst(c, musicBus, { duration: 0.09, peak: 0.1, filterType: 'bandpass', filterFreq: 420, filterQ: 1.4 })
 }
 
 function scheduleMusicStep(token: number, step: number, theme: DungeonTheme) {
   if (token !== musicRunToken) return
   const c = ensureContext()
   pluck(c, theme.scale[theme.motif[step % theme.motif.length]], theme)
-  if (theme.pulseSteps && step % theme.pulseSteps === 0) heartbeatPulse(c)
+  if (theme.pulseSteps && step % theme.pulseSteps === 0) dreadPulse(c)
   window.setTimeout(() => scheduleMusicStep(token, step + 1, theme), theme.stepSeconds * 1000)
 }
 
