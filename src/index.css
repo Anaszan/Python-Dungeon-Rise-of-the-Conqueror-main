@@ -1393,6 +1393,14 @@ canvas {
 .profile-panel {
   max-height: 100%;
   overflow-y: auto;
+  /* .auth-panel's gutters are sized for a login form — two fields and a
+     button — and leave barely 600px of content on a laptop. This panel
+     holds the same appearance editor the create screen does, and that
+     editor needs the room to stand the character beside the options
+     instead of on top of them. Matched to .customize-panel, which is
+     exactly the screen it is being asked to look like. */
+  padding-left: calc(clamp(20px, 15vw, 340px) + env(safe-area-inset-left));
+  padding-right: calc(clamp(20px, 15vw, 340px) + env(safe-area-inset-right));
 }
 
 .profile-header {
@@ -2028,11 +2036,18 @@ canvas {
   text-align: center;
 }
 
-@container (min-width: 620px) {
+/* 520px is about where a column of options and a portrait beside it both
+   still work: the options keep ~300px, which holds the class buttons on two
+   rows, and the portrait keeps its 200px minimum. It started at 620px, which
+   the profile panel missed by a few pixels and so stacked — see
+   .profile-panel for the other half of that fix. */
+@container (min-width: 520px) {
   /* Options on the left, character on the right. The right column is capped
-     so a very wide screen grows the options rather than the portrait. */
+     so a very wide screen grows the options rather than the portrait, and
+     floored so a just-wide-enough one still shows a character rather than a
+     sliver of one. */
   .appearance-layout {
-    grid-template-columns: minmax(0, 1fr) clamp(240px, 32%, 340px);
+    grid-template-columns: minmax(0, 1fr) clamp(200px, 34%, 340px);
     align-items: start;
   }
 
