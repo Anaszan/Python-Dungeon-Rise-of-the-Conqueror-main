@@ -2014,16 +2014,17 @@ canvas {
   margin-bottom: 20px;
 }
 
-/* The appearance picker's own two-column split.
-   Measured against this element's width rather than the viewport's, because
-   the same picker is used in two very differently sized places: the
-   full-width customize screen and the narrow profile panel. A viewport media
-   query would put the profile panel into two columns on a desktop too, where
-   it has nothing like the room. */
-.appearance-picker {
-  container-type: inline-size;
-}
-
+/* The appearance picker's two-column split — the same layout on the create
+   screen and in the profile's "แก้ไขตัวละคร" section, because it is the same
+   component and should not look like two different features.
+   This was a container query at first, on the reasoning that the profile
+   panel was far narrower than the create screen and should stack. That is
+   no longer true — .profile-panel now carries the same gutters as
+   .customize-panel — so the container's width is just a fixed fraction of
+   the viewport (0.7 of it, between 133px and 2266px wide), and the query
+   was measuring the long way round something a media query answers
+   directly. One mechanism, and one that is simple to check against a real
+   window size. */
 .appearance-layout {
   display: grid;
   gap: 20px;
@@ -2036,12 +2037,11 @@ canvas {
   text-align: center;
 }
 
-/* 520px is about where a column of options and a portrait beside it both
-   still work: the options keep ~300px, which holds the class buttons on two
-   rows, and the portrait keeps its 200px minimum. It started at 620px, which
-   the profile panel missed by a few pixels and so stacked — see
-   .profile-panel for the other half of that fix. */
-@container (min-width: 520px) {
+/* At 900px the gutters leave ~630px of content, which splits into a 410px
+   column of options and a 200px character beside it. Below that the
+   character goes back on top, where a narrow window has the width to show
+   it properly. */
+@media (min-width: 900px) {
   /* Options on the left, character on the right. The right column is capped
      so a very wide screen grows the options rather than the portrait, and
      floored so a just-wide-enough one still shows a character rather than a
