@@ -1384,15 +1384,28 @@ canvas {
   box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.15);
 }
 
+/* Above the dungeon's own furniture, not under it.
+   At z-index 10 this sat below the HUD (20), the joystick (50) and the
+   pause/sound buttons (60), so opening the profile over a live dungeon drew
+   the player's HP card straight across the top of the panel and left the
+   joystick sitting in its bottom corner. A panel that takes the whole screen
+   is the thing being used while it is open, so it goes to the same tier as
+   the pause menu — the admin console (80) still wins, since it can be opened
+   from on top of these. */
 .profile-overlay {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 70;
 }
 
 .profile-panel {
   max-height: 100%;
   overflow-y: auto;
+  /* .auth-panel centres its column vertically, which is right for a login
+     form and wrong for anything that scrolls: once the content is taller
+     than the panel, centring pushes the first rows off the top edge where
+     scrolling cannot reach them. This panel is always taller than that. */
+  justify-content: flex-start;
   /* .auth-panel's gutters are sized for a login form — two fields and a
      button — and leave barely 600px of content on a laptop. This panel
      holds the same appearance editor the create screen does, and that
@@ -1497,10 +1510,13 @@ canvas {
   font-weight: 600;
 }
 
+/* Same tier, same reason as .profile-overlay above — it is the other
+   full-screen panel opened from inside a live dungeon, and it had the same
+   HUD drawn across it. */
 .leaderboard-overlay {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 70;
 }
 
 .leaderboard-list {
@@ -2049,6 +2065,13 @@ canvas {
   .appearance-layout {
     grid-template-columns: minmax(0, 1fr) clamp(200px, 34%, 340px);
     align-items: start;
+    /* The options are only about 460px of content at their widest (nine
+       swatches on one row). Left to fill a 1300px panel they end up a
+       third of the way across it with the character marooned on the far
+       edge and a hand's width of nothing in between, so the pair is capped
+       and centred instead. */
+    max-width: 900px;
+    margin-inline: auto;
   }
 
   .appearance-controls {
