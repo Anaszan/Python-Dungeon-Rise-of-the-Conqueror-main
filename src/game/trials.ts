@@ -1,5 +1,6 @@
 import type { CodeCheck, LessonData } from './lessons'
 import { pickVariant } from './lessons'
+import { parseBlanks, type BlankTemplate } from './blanks'
 import type { Difficulty } from './difficulty'
 
 // The hard-mode content: one โจทย์ ("trial") per code box per monster.
@@ -769,12 +770,26 @@ export function bossTrial(lesson: LessonData, kind: 'attack' | 'skill'): TrialSp
   }
 }
 
-// What one code box should start out holding. `trial` is null only for an
-// ordinary monster in easy mode, which is what tells the UI to render a plain
-// fill-in-the-blank box with no brief and no pre-cast gate.
+// What one code box should start out holding, and which of the two kinds of
+// box it is.
+//
+// Exactly one of the two is ever set. `trial` is the hard-mode / boss case:
+// a written โจทย์, an editor that starts empty, and checks that gate the
+// cast. `blanks` is the easy-mode case: the chapter's skeleton split on its
+// `___` markers, which the UI renders as read-only code with an input box
+// where each blank was, so the only thing the player can touch is the answer
+// (see blanks.ts).
 export type SpellTask = {
   code: string
   trial: TrialSpec | null
+  blanks: BlankTemplate | null
+}
+
+// Easy mode's half of pickSpellTask: the skeleton, plus the split of it the
+// fill-in-the-blank editor needs.
+function skeletonTask(skeletons: string[], seed: string): SpellTask {
+  const code = pickVariant(skeletons, seed)
+  return { code, trial: null, blanks: parseBlanks(code) }
 }
 
 export function pickSpellTask(
@@ -790,18 +805,18 @@ export function pickSpellTask(
 
   if (isBoss) {
     const trial = bossTrial(lesson, kind)
-    if (trial) return { code: trialStarterCode(trial), trial }
+    if (trial) return { code: trialStarterCode(trial), trial, blanks: null }
   }
 
-  if (difficulty !== 'hard') return { code: pickVariant(skeletons, seed), trial: null }
+  if (difficulty !== 'hard') return skeletonTask(skeletons, seed)
 
   const set = trialsForLesson(lesson)
   const variants = kind === 'attack' ? set?.attack : set?.skill
   // A chapter with no trials authored would silently fall back to the easy
   // skeleton rather than handing the player an empty editor with no โจทย์.
   // levels.test.ts fails the build before that can ship.
-  if (!variants || variants.length === 0) return { code: pickVariant(skeletons, seed), trial: null }
+  if (!variants || variants.length === 0) return skeletonTask(skeletons, seed)
 
   const trial = pickVariant(variants, seed)
-  return { code: trialStarterCode(trial), trial }
+  return { code: trialStarterCode(trial), trial, blanks: null }
 }

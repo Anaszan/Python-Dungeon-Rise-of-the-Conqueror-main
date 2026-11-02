@@ -563,6 +563,96 @@ canvas {
   opacity: 0.6;
 }
 
+/* Easy mode's fill-in-the-blank editor (FillInCode). Deliberately styled to
+   read as the same editor as .spell-textarea above — same ink, same
+   monospace, same dark panel — so the difference the player notices is the
+   one that matters: here, only the gold boxes can be typed in. */
+.fill-code {
+  width: 100%;
+  padding: 8px 12px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--gold-dim);
+  background: var(--wood-dark);
+  box-sizing: border-box;
+  overflow-x: auto;
+}
+
+.fill-code-hint {
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(201, 162, 74, 0.25);
+  font-size: 11.5px;
+  color: var(--gold);
+}
+
+.fill-code-source {
+  display: block;
+  /* pre-wrap, not pre: the in-dungeon panel is narrow and a long comment
+     line should wrap rather than push the blanks off the side. */
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.9;
+  color: #cfe9c8;
+  tab-size: 4;
+}
+
+.spell-box-compact .fill-code-source {
+  font-size: 12px;
+}
+
+/* The only thing on this panel that can be typed in, and it has to look it
+   at a glance: gold where the code is green, and raised off the line. */
+.fill-blank {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--wood-dark);
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  border: 1px solid var(--gold-bright);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: 0 1px;
+  text-align: center;
+  box-sizing: content-box;
+  vertical-align: baseline;
+}
+
+.fill-blank:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(240, 200, 90, 0.3);
+}
+
+.fill-blank:disabled {
+  opacity: 0.6;
+}
+
+/* An unanswered blank is hollow and breathing, so "this one is still waiting
+   for you" survives being one small box in the middle of a wall of code. */
+.fill-blank-empty {
+  color: var(--gold-bright);
+  background: rgba(240, 200, 90, 0.1);
+  border-style: dashed;
+  animation: fill-blank-wait 1.8s ease-in-out infinite;
+}
+
+@keyframes fill-blank-wait {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(240, 200, 90, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(240, 200, 90, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill-blank-empty {
+    animation: none;
+    box-shadow: 0 0 0 2px rgba(240, 200, 90, 0.3);
+  }
+}
+
 .spell-log {
   margin-top: 8px;
   padding: 8px 12px;

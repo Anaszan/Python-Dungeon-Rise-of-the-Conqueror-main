@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { castSpell, getPyodide } from './pyodideRuntime'
 import type { LessonData } from './lessons'
 import { missingCheck, pickSpellTask, type SpellTask } from './trials'
+import { fillBlanks, unfilledBlanks, type BlankTemplate } from './blanks'
 import { TrialBrief } from './TrialBrief'
 import type { Difficulty } from './difficulty'
 
@@ -42,7 +43,14 @@ function insertTab(code: string, el: HTMLTextAreaElement): { next: string; caret
 }
 
 export type BoxState = {
+  // What actually gets cast. In hard mode the player types it directly; in
+  // easy mode it is recomposed from the skeleton and the blanks below every
+  // time one of them is answered, so everything downstream — the run, the
+  // trial checks, the log — sees one kind of thing either way.
   code: string
+  // Easy mode only: one entry per `___` in the skeleton, in order. Empty for
+  // a hard-mode or boss box, which has no blanks to answer.
+  answers: string[]
   casting: boolean
   log: string[]
   error: string | null
@@ -50,8 +58,33 @@ export type BoxState = {
 
 // Not exported: this file is a component module, and a non-component export
 // costs the whole file its fast-refresh. PracticeConsole keeps its own copy.
-function freshBox(code: string): BoxState {
-  return { code, casting: false, log: [], error: null }
+function freshBox(task: SpellTask): BoxState {
+  return {
+    code: task.code,
+    answers: task.blanks ? Array<string>(task.blanks.count).fill('') : [],
+    casting: false,
+    log: [],
+    error: null,
+  }
+}
+
+// Answering one blank: the box keeps the answers, and `code` is rebuilt from
+// them so the rest of the console never has to know which kind of box this
+// was.
+function withAnswer(box: BoxState, task: SpellTask, index: number, value: string): BoxState {
+  if (!task.blanks) return box
+  const answers = box.answers.map((a, i) => (i === index ? value : a))
+  return { ...box, answers, code: fillBlanks(task.blanks, answers) }
+}
+
+// The message a box shows instead of casting when the player has not filled
+// everything in. Pyodide would raise a SyntaxError on the leftover `___`,
+// which is true but says nothing about what to do next.
+function unfilledMessage(task: SpellTask, box: BoxState): string | null {
+  if (!task.blanks) return null
+  const left = unfilledBlanks(task.blanks, box.answers)
+  if (left === 0) return null
+  return `ยังเติมไม่ครบ — เหลืออีก ${left} ช่อง เติมช่องสีทองในโค้ดให้ครบก่อนแล้วค่อยร่าย`
 }
 
 // The Python code sandbox that replaced the old placeholder Attack/skill
@@ -62,10 +95,12 @@ function freshBox(code: string): BoxState {
 // bindings — whichever function the code calls is the effect that happens,
 // regardless of which box it was typed in.
 //
-// What each box *starts* holding depends on the difficulty the player chose
-// before the first level (see difficulty.ts): easy hands over the chapter's
-// fill-in-the-blank skeleton, hard hands over the monster's โจทย์ and an empty
-// editor, and refuses to cast until the code satisfies it.
+// What each box *is* depends on the difficulty the player chose before the
+// first level (see difficulty.ts). Easy hands over the chapter's skeleton as
+// read-only code with a gold input box in each hole, and the player answers
+// the holes — they cannot edit, or break, the spell around them. Hard hands
+// over the monster's โจทย์ and an empty editor, and refuses to cast until the
+// code satisfies it. The level's boss asks the hard version of either.
 export function SpellConsole({
   lesson,
   difficulty,
@@ -99,19 +134,19 @@ export function SpellConsole({
     [lesson, difficulty, monsterId, isBoss],
   )
 
-  const [attackBox, setAttackBox] = useState<BoxState>(() => freshBox(attackTask.code))
-  const [skillBox, setSkillBox] = useState<BoxState>(() => freshBox(skillTask.code))
+  const [attackBox, setAttackBox] = useState<BoxState>(() => freshBox(attackTask))
+  const [skillBox, setSkillBox] = useState<BoxState>(() => freshBox(skillTask))
 
   // Reset both editors whenever the task changes (new monster, new level, or
   // the difficulty switched mid-run) — otherwise a previous fight's finished
   // code would carry over and the new โจทย์ would be answered before it was
   // read.
   useEffect(() => {
-    setAttackBox(freshBox(attackTask.code))
+    setAttackBox(freshBox(attackTask))
   }, [attackTask])
 
   useEffect(() => {
-    setSkillBox(freshBox(skillTask.code))
+    setSkillBox(freshBox(skillTask))
   }, [skillTask])
 
   // Warm the Pyodide runtime the moment the console mounts (first combat of
@@ -130,6 +165,15 @@ export function SpellConsole({
   }, [])
 
   async function run(box: BoxState, setBox: (b: BoxState) => void, task: SpellTask) {
+    // Easy mode: a skeleton with a blank still in it cannot be cast. Said
+    // here rather than let through to Python, which would only answer with a
+    // SyntaxError pointing at the underscores.
+    const unfilled = unfilledMessage(task, box)
+    if (unfilled) {
+      setBox({ ...box, casting: false, log: [], error: unfilled })
+      return
+    }
+
     // Hard mode only: the โจทย์ is checked against the source *before* the code
     // ever reaches Pyodide, so a spell that ignores the chapter's syntax
     // simply does not fire — no damage, and no cooldown spent either, since
@@ -166,7 +210,9 @@ export function SpellConsole({
         title={`โจมตี — ใส่ ${monsterName}`}
         state={attackBox}
         brief={attackTask.trial && <TrialBrief trial={attackTask.trial} code={attackBox.code} />}
+        blanks={attackTask.blanks}
         onChange={(code) => setAttackBox({ ...attackBox, code })}
+        onAnswer={(i, value) => setAttackBox(withAnswer(attackBox, attackTask, i, value))}
         onRun={() => run(attackBox, setAttackBox, attackTask)}
         compact={compact}
         label={
@@ -186,7 +232,9 @@ export function SpellConsole({
         title="สกิลพิเศษ"
         state={skillBox}
         brief={skillTask.trial && <TrialBrief trial={skillTask.trial} code={skillBox.code} />}
+        blanks={skillTask.blanks}
         onChange={(code) => setSkillBox({ ...skillBox, code })}
+        onAnswer={(i, value) => setSkillBox(withAnswer(skillBox, skillTask, i, value))}
         onRun={() => run(skillBox, setSkillBox, skillTask)}
         compact={compact}
         label={
@@ -206,11 +254,68 @@ export function SpellConsole({
   )
 }
 
+// Easy mode's editor: the chapter's spell shown as it is, with a box sitting
+// in each hole the player has to fill.
+//
+// The code around the blanks is text, not an editable field, which is the
+// whole change — the exercise is now "answer this", not "find the three
+// underscores in this wall of code, delete them without breaking anything
+// else, and type in their place". The `# TODO:` note the skeleton already
+// carried stays right beside its own blank and reads as the question.
+function FillInCode({
+  template,
+  answers,
+  onAnswer,
+  disabled,
+}: {
+  template: BlankTemplate
+  answers: string[]
+  onAnswer: (index: number, value: string) => void
+  disabled: boolean
+}) {
+  const left = unfilledBlanks(template, answers)
+
+  return (
+    <div className="fill-code">
+      <p className="fill-code-hint">
+        {left > 0
+          ? `✎ เติมเฉพาะช่องสีทอง — เหลืออีก ${left} ช่อง`
+          : '✓ เติมครบแล้ว กดร่ายคาถาได้เลย'}
+      </p>
+      <code className="fill-code-source">
+        {template.segments.map((segment, i) => (
+          <Fragment key={i}>
+            {segment}
+            {i < template.count && (
+              <input
+                type="text"
+                className={`fill-blank${(answers[i] ?? '').trim() === '' ? ' fill-blank-empty' : ''}`}
+                value={answers[i] ?? ''}
+                onChange={(e) => onAnswer(i, e.target.value)}
+                disabled={disabled}
+                spellCheck={false}
+                autoComplete="off"
+                aria-label={`ช่องที่ต้องเติม ${i + 1} จาก ${template.count}`}
+                // Grows with what is typed instead of scrolling inside a
+                // fixed box: the answer has to stay readable in the middle
+                // of the line it belongs to.
+                style={{ width: `${Math.max(4, (answers[i] ?? '').length + 1)}ch` }}
+              />
+            )}
+          </Fragment>
+        ))}
+      </code>
+    </div>
+  )
+}
+
 export function CodeBox({
   title,
   state,
   brief,
+  blanks = null,
   onChange,
+  onAnswer,
   onRun,
   label,
   disabled,
@@ -221,7 +326,11 @@ export function CodeBox({
   // Hard mode's โจทย์ panel, rendered between the title and the editor. Left
   // out entirely in easy mode, where the skeleton itself is the instruction.
   brief?: ReactNode
+  // Set in easy mode only, and what decides which of the two editors this
+  // box is: fill-in-the-blanks when present, a free textarea when not.
+  blanks?: BlankTemplate | null
   onChange: (code: string) => void
+  onAnswer?: (index: number, value: string) => void
   onRun: () => void
   label: string
   disabled: boolean
@@ -242,17 +351,21 @@ export function CodeBox({
     <div className={`spell-box${compact ? ' spell-box-compact' : ''}`}>
       <p className="spell-console-label">{title}</p>
       {brief}
-      <textarea
-        className="spell-textarea"
-        value={state.code}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        spellCheck={false}
-        disabled={state.casting}
-        // Hard mode's editor starts with the โจทย์ as comments and the whole
-        // spell still to write, so it gets more room than a one-blank skeleton.
-        rows={compact ? (brief ? 9 : 5) : brief ? 12 : 6}
-      />
+      {blanks && blanks.count > 0 && onAnswer ? (
+        <FillInCode template={blanks} answers={state.answers} onAnswer={onAnswer} disabled={state.casting} />
+      ) : (
+        <textarea
+          className="spell-textarea"
+          value={state.code}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          spellCheck={false}
+          disabled={state.casting}
+          // Hard mode's editor starts with the โจทย์ as comments and the whole
+          // spell still to write, so it gets more room than a one-blank skeleton.
+          rows={compact ? (brief ? 9 : 5) : brief ? 12 : 6}
+        />
+      )}
       {(state.log.length > 0 || state.error) && (
         <div className="spell-log">
           {state.log.map((line, i) => (

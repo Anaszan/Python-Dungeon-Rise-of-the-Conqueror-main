@@ -27,11 +27,19 @@ export type LessonData = {
   // comment so looking at it is enough — no need to actually run it.
   exampleCode: string
   // Fill-in-the-blank starting code for each of the two SpellConsole boxes.
-  // Left with `___` placeholders on purpose — running it unmodified throws a
-  // SyntaxError, which the runtime already explains in-character, so an
-  // untouched skeleton reads as "you still need to finish this" rather than
-  // a silent no-op. Most levels only need one variant; level 1 has several
-  // so the blank sometimes asks for a number literal and sometimes for a
+  //
+  // Each `___` is a hole the player answers. They are not placeholder text
+  // in an editable file any more: easy mode splits the skeleton on them and
+  // renders the code read-only with an input box in each hole (blanks.ts,
+  // FillInCode), so the `___` never reaches the screen and the console
+  // refuses to cast while one is unanswered. The `# TODO:` note beside a
+  // blank is the question that blank is asking, and is read as such — keep
+  // writing one for every blank added here.
+  //
+  // Every skeleton must contain at least one `___`, or easy mode would show
+  // a wall of code with nothing to do; blanks.test.ts enforces that across
+  // every variant. Most levels only need one variant; level 1 has several so
+  // the blank sometimes asks for a number literal and sometimes for a
   // variable name instead of always the same fill-in — see pickVariant().
   // Hard mode ignores these entirely and uses trials.ts instead.
   attackSkeletons: string[]
