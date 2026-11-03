@@ -984,6 +984,20 @@ canvas {
   color: var(--parchment-text);
 }
 
+/* Every full-screen panel in the game is a flex item of the overlay above,
+   and every one of them sets `width: 100%` meaning "fill the window". That
+   is not the ceiling it reads as: a flex item's automatic minimum size is
+   its min-content, so one child too wide to fit makes the *panel* grow past
+   the window instead of the child overflowing the panel. The profile's
+   character preview did exactly that — the panel kept widening while the
+   gutters stayed put at 15vw of a window that was not moving, which is what
+   gave the cause away. A panel that is supposed to fill the window is never
+   the thing that should stretch. */
+.screen-overlay > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .story-panel {
   width: 100%;
   min-height: 100%;
@@ -2104,6 +2118,7 @@ canvas {
 }
 
 .customize-preview {
+  position: relative;
   width: 100%;
   height: 220px;
   border-radius: 6px;
@@ -2111,6 +2126,24 @@ canvas {
   background: var(--wood-dark);
   border: 1px solid var(--gold-dim);
   margin-bottom: 20px;
+}
+
+/* r3f's <Canvas> is a 100%-sized div around a 100%-sized div around a bare
+   <canvas>, and three.js writes that canvas an explicit *pixel* width from
+   the size it just measured (WebGLRenderer.setSize with updateStyle, which
+   r3f always passes). A pixel-wide element inside two auto-width wrappers is
+   a min-content floor, and anything up the tree that sizes itself from its
+   content picks it up — then the canvas measures the wider box and writes a
+   wider pixel width, and the box grows again every frame.
+   Taking the wrapper out of flow ends that for good: an absolutely
+   positioned child contributes nothing to any ancestor's intrinsic size, so
+   the width only ever travels downwards, from this box (which has one) into
+   the canvas. The guards further up the tree (.appearance-layout's explicit
+   track, .auth-panel's min-width) stop the same thing happening through some
+   other child; this one stops it at the source. */
+.customize-preview > * {
+  position: absolute;
+  inset: 0;
 }
 
 /* The appearance picker's two-column split — the same layout on the create
