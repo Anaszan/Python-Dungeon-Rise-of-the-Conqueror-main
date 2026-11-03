@@ -12,7 +12,7 @@ const names = [
   'wraith', 'nullwraith', 'echowraith', 'dragon',
   // level 2
   'goblinwarrior', 'goblinmarauder', 'orc', 'orcberserker', 'ghostspecter',
-  'wispspecter', 'hollowspecter', 'wraithelite', 'wraithsovereign', 'elderdragon',
+  'wispspecter', 'hollowspecter', 'wraithelite', 'wraithsovereign', 'bonetyrant',
   // level 3
   'imp', 'loopimp', 'goblinraider', 'goblinskirmisher', 'goblinvanguard',
   'banshee', 'wailingbanshee', 'shriekingbanshee', 'hydra',

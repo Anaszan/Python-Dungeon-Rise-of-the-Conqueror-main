@@ -2526,6 +2526,28 @@ canvas {
   max-width: none;
 }
 
+/* The strip that labels hard mode's empty editor, sitting at the very bottom
+   of the brief so it reads straight into the box underneath. Negative margin
+   because the brief has 10px of its own below it: this one tucks right up
+   against the editor instead, which is how it reads as that box's caption
+   and not as another line of the brief. Gold like easy mode's
+   .fill-code-hint, because it is the same sentence for the same job. */
+.write-here {
+  margin: 10px -12px -10px;
+  padding: 7px 12px;
+  border-top: 1px dashed var(--gold-dim);
+  border-radius: 0 0 5px 5px;
+  background: rgba(240, 200, 90, 0.08);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.write-here-done {
+  background: rgba(110, 200, 120, 0.1);
+  color: #8fd79a;
+}
+
 /* --- แผงควบคุมแอดมิน (src/admin/) -----------------------------------------
    Sits above the pause menu (z-index 70) because it can be opened from inside
    it — warping while paused has to be visible. */

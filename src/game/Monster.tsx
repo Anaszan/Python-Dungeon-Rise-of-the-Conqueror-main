@@ -111,7 +111,7 @@ class MonsterArtBoundary extends Component<{ fallback: ReactNode; children: Reac
 // Not exported: a non-component export here would cost this file its fast
 // refresh, and nothing outside the dungeon draws a monster any more.
 function monsterScale(name: string): number {
-  if (name === 'Elder Dragon') return 1.8
+  if (name === 'Bone Tyrant') return 1.8
   if (name === 'Hydra') return 1.6
   if (name === 'Dragon') return 1.5
   return 1

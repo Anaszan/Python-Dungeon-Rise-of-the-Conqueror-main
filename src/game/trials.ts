@@ -597,16 +597,28 @@ export const ALL_TRIAL_SETS: { chapter: number; trials: TrialSet }[] = Object.en
 
 // The editor in hard mode starts with the โจทย์ written out as comments and
 // nothing else — no code to lean on, which is the entire point. The brief is
-// also rendered above the box (TrialBrief), so this is a convenience for
-// players who prefer to read the requirements next to what they type.
+// also rendered above the box (TrialBrief); this is the copy of it that sits
+// in the editor, next to what the player types.
+//
+// Every requirement gets its own slot: the demand on one line, an arrow on
+// the next, and two empty lines under that to write in. It used to list all
+// the demands in a block at the top and then offer a single
+// "เขียนคาถาของเจ้าเองใต้บรรทัดนี้" marker at the bottom, which said where to
+// start but nothing about which part of the spell went where — so three
+// numbered demands landed in one undivided space and the player had to hold
+// the mapping in their head. Easy mode marks the exact spot for every answer
+// (blanks.ts); this is as close as hard mode gets to that without writing
+// any of the code for them.
 export function trialStarterCode(trial: TrialSpec): string {
-  return [
+  const lines = [
     `# โจทย์จากมอนสเตอร์: ${trial.title}`,
-    ...trial.brief.map((line, i) => `# ${i + 1}. ${line}`),
-    '# --- เขียนคาถาของเจ้าเองใต้บรรทัดนี้ ---',
+    '# กล่องนี้ว่างไว้ให้เจ้าเขียนเองทั้งหมด — เขียนใต้ลูกศรของแต่ละข้อ',
     '',
-    '',
-  ].join('\n')
+  ]
+  for (const [i, demand] of trial.brief.entries()) {
+    lines.push(`# ${i + 1}) ${demand}`, '# ↓', '', '')
+  }
+  return lines.join('\n')
 }
 
 // Checks read the player's source, and the starter code hands them a comment
@@ -623,6 +635,15 @@ export function stripComments(code: string): string {
 export function missingCheck(trial: TrialSpec, code: string): CodeCheck | undefined {
   const source = stripComments(code)
   return trial.checks.find((c) => !c.pattern.test(source))
+}
+
+// How many of the โจทย์'s demands the code has still not met. The checklist
+// above the editor shows which ones; this is the count the editor's own
+// "write here" strip puts on itself, so the box says how far off it is
+// without the player having to re-read the list every keystroke.
+export function remainingChecks(trial: TrialSpec, code: string): number {
+  const source = stripComments(code)
+  return trial.checks.filter((c) => !c.pattern.test(source)).length
 }
 
 // The boss's own โจทย์ — what the sealed door used to ask, now asked by the

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { stripComments, type TrialSpec } from './trials'
+import { remainingChecks, stripComments, type TrialSpec } from './trials'
 
 // The hard-mode header that sits on top of a code box: what the monster is
 // demanding, and a live checklist that lights up as the player's code starts
@@ -12,6 +12,7 @@ import { stripComments, type TrialSpec } from './trials'
 export function TrialBrief({ trial, code }: { trial: TrialSpec; code: string }) {
   const [showHints, setShowHints] = useState(false)
   const source = stripComments(code)
+  const remaining = remainingChecks(trial, code)
 
   return (
     <div className="trial-brief">
@@ -41,6 +42,19 @@ export function TrialBrief({ trial, code }: { trial: TrialSpec; code: string }) 
           ))}
         </div>
       )}
+
+      {/* The last thing before the editor, and the thing that labels it.
+          Hard mode's box is empty on purpose, which left it looking like a
+          scratch pad rather than the answer sheet — easy mode marks every
+          spot it wants filled (see .fill-code-hint), and this is the same
+          sentence for a box where the spot is "all of it". The count is the
+          checklist above, said again at the moment the player's eyes are
+          already on the box. */}
+      <p className={`write-here${remaining === 0 ? ' write-here-done' : ''}`}>
+        {remaining === 0
+          ? '✓ ครบทุกข้อแล้ว กดร่ายคาถาได้เลย'
+          : `✍ เขียนคาถาเองทั้งหมดในกล่องข้างล่าง — ยังขาดอีก ${remaining} ข้อ`}
+      </p>
     </div>
   )
 }

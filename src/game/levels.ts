@@ -256,7 +256,13 @@ const LEVEL_2_MONSTERS: MonsterData[] = [
 
   // end room
   { id: 'wraith-elite-2', name: 'Wraith Sovereign', maxHp: 120, color: '#4a3570', attackDamage: 18, attackInterval: 10, position: [-4, 0.5, -45], modelUrl: '/monsters/wraithsovereign_attack.glb', imageUrl: '/monsters/wraithsovereign_attack.png' },
-  { id: 'elder-dragon-1', name: 'Elder Dragon', boss: true, maxHp: 260, color: '#c21f3a', attackDamage: 28, attackInterval: 10, position: [4, 0.5, -46], modelUrl: '/monsters/elderdragon_attack.glb', imageUrl: '/monsters/elderdragon_attack.png' },
+  // The crypt's own boss, not a second dragon. Level 1 closes with the
+  // Dragon, and this level used to close with the Elder Dragon — the same
+  // rig in a darker red, which read as the same fight twice over and had
+  // nothing to do with a floor full of goblins, orcs, specters and wraiths.
+  // The Bone Tyrant is what that floor adds up to: the crowned dead it all
+  // answers to (blender/build_monsters_level2.py, build_bone_tyrant).
+  { id: 'bone-tyrant-1', name: 'Bone Tyrant', boss: true, maxHp: 260, color: '#ded3b4', attackDamage: 28, attackInterval: 10, position: [4, 0.5, -46], modelUrl: '/monsters/bonetyrant_attack.glb', imageUrl: '/monsters/bonetyrant_attack.png' },
 
   // vault room
   { id: 'specter-3', name: 'Hollow Specter', maxHp: 60, color: '#7fb8d9', attackDamage: 14, attackInterval: 10, position: [-10, 0.5, -45], modelUrl: '/monsters/hollowspecter_attack.glb', imageUrl: '/monsters/hollowspecter_attack.png' },

@@ -902,9 +902,124 @@ def build_elder_dragon():
     return 12
 
 
+def build_bone_tyrant():
+    """Bone Tyrant — level 2's boss: the crowned dead that the crypt answers to.
+
+    This floor's boss used to be the Elder Dragon, which is the same eight-part
+    rig as level 1's Dragon (jaw / head / neck / tail / two wings / body /
+    legs) in a darker red. Side by side they read as one monster shown twice,
+    and a dragon was never what this level was building toward anyway — its
+    cast is goblins, orcs, specters and wraiths in a crypt. So the boss is
+    built out of what the floor is made of: a skeleton the height of the room,
+    crowned, leaning on a bone scythe, with the skulls of the ones that came
+    before it circling at its shoulder.
+
+    build_elder_dragon stays below and still exports its own GLB; nothing
+    points at it any more.
+    """
+    reset()
+    BONEL = mat("BtBone", "ded3b4", rough=0.6)
+    BONED = mat("BtBoneD", "9a8d6d", rough=0.72)
+    SHROUD = mat("BtShroud", "2e2440", rough=0.9)
+    SHROUDD = mat("BtShroudD", "1a1428", rough=0.95)
+    CROWN = mat("BtCrown", "d9b24c", rough=0.35, metal=0.8)
+    EYE = mat("BtEye", "7ad7a0", rough=0.2, emit=1.9)       # grave-light, not dragon-gold
+    BLADE = mat("BtBlade", "d8e0d6", rough=0.28, metal=0.55)
+
+    # Bare legs: the shroud starts at the hips, so what walks is bone. Kept
+    # short and thick on purpose — the first pass gave it a stork's legs at
+    # nearly half its own height, which read as spindly rather than as the
+    # heaviest thing on the floor.
+    group('legs')
+    for s in (-1, 1):
+        cube((s * 0.19, -0.09, 0.04), scale=(0.20, 0.38, 0.08), m=BONED)
+        cyl((s * 0.19, 0.0, 0.25), r=0.065, depth=0.36, verts=7, m=BONEL)
+        ico((s * 0.19, 0.0, 0.44), r=0.082, sub=1, m=BONED)
+        cyl((s * 0.19, 0.01, 0.62), r=0.074, depth=0.36, verts=7, m=BONEL)
+    cube((0, 0, 0.87), scale=(0.50, 0.27, 0.20), m=BONED)
+
+    # Rib cage left open at the front — the silhouette that says "skeleton"
+    # from across a dark room. The shroud sits behind it (+Y) so it reads as a
+    # cape rather than a coat.
+    group('torso', pivot=(0, 0, 0.95))
+    cyl((0, 0.04, 1.18), r=0.055, depth=0.56, verts=6, m=BONED)
+    for zz, rr in ((0.99, 0.27), (1.13, 0.30), (1.27, 0.29), (1.39, 0.25)):
+        torus((0, 0.0, zz), major=rr, minor=0.029, m=BONEL)
+    cube((0, 0.0, 1.50), scale=(0.64, 0.16, 0.08), m=BONEL)
+    cone((0, 0.21, 1.04), r1=0.48, r2=0.28, depth=1.00, verts=9, m=SHROUD, rot=(0.16, 0, 0))
+    cone((0, 0.27, 1.28), r1=0.41, r2=0.21, depth=0.64, verts=7, m=SHROUDD, rot=(0.30, 0, 0))
+    for s in (-1, 1):                                        # pauldrons
+        ico((s * 0.35, 0.06, 1.53), r=0.17, sub=1, scale=(1.0, 0.9, 0.55), m=SHROUDD)
+
+    group('head', pivot=(0, 0, 1.55), parent='torso')
+    ico((0, -0.04, 1.70), r=0.205, sub=2, scale=(1.0, 1.10, 1.06), m=BONEL)
+    for s in (-1, 1):
+        ico((s * 0.088, -0.19, 1.72), r=0.060, sub=2, m=PUPIL)
+        ico((s * 0.091, -0.215, 1.72), r=0.038, sub=2, m=EYE)
+    cone((0, -0.225, 1.64), r1=0.042, depth=0.07, verts=4, m=PUPIL, rot=(-PI / 2, 0, 0))
+    torus((0, -0.02, 1.83), major=0.205, minor=0.023, m=CROWN)
+    for i in range(7):
+        a = 2 * PI * i / 7
+        cone((0.195 * math.cos(a), -0.02 + 0.195 * math.sin(a), 1.93),
+             r1=0.036, r2=0.0, depth=0.20, verts=4, m=CROWN)
+
+    group('jaw', pivot=(0, -0.07, 1.63), parent='head')
+    cube((0, -0.14, 1.595), scale=(0.21, 0.22, 0.058), m=BONED)
+    for s in (-1, 1):
+        for k in range(3):
+            cone((s * (0.047 + k * 0.035), -0.21, 1.613), r1=0.016, depth=0.05,
+                 verts=4, m=BONEL, rot=(PI, 0, 0))
+
+    for side, gname in ((-1, 'arm_r'), (1, 'arm_l')):
+        group(gname, pivot=(side * 0.32, 0.02, 1.49), parent='torso')
+        ico((side * 0.32, 0.03, 1.49), r=0.085, sub=1, m=BONED)
+        cyl((side * 0.345, 0.02, 1.30), r=0.047, depth=0.34, verts=6, m=BONEL)
+        ico((side * 0.355, 0.015, 1.12), r=0.056, sub=1, m=BONED)
+        cyl((side * 0.365, 0.0, 0.95), r=0.042, depth=0.32, verts=6, m=BONEL)
+        ico((side * 0.370, -0.02, 0.79), r=0.056, sub=1, m=BONEL)
+
+    # The scythe, held in the right hand. Thin three-vertex cones are flat
+    # triangles (the same trick the dragon's wings use), turned so the blade
+    # lies in the plane the arm swings through.
+    group('arm_r')
+    cyl((-0.370, -0.03, 1.22), r=0.029, depth=1.54, verts=6, m=BONED, rot=(0.10, 0, 0))
+    cone((-0.370, -0.33, 1.88), r1=0.36, depth=0.045, verts=3, m=BLADE, rot=(0, PI / 2, 0))
+    cone((-0.370, -0.14, 1.99), r1=0.18, depth=0.04, verts=3, m=BLADE, rot=(0, PI / 2, 0.9))
+    torus((-0.370, -0.03, 1.96), major=0.058, minor=0.019, m=CROWN, rot=(0, PI / 2, 0))
+
+    # Five skulls on a slow orbit — the boss's own dead, and the one part of
+    # it that keeps moving while it winds up.
+    group('wards', pivot=(0, 0, 1.26))
+    for i in range(5):
+        a = 2 * PI * i / 5 + 0.4
+        x, y = 0.74 * math.cos(a), 0.74 * math.sin(a)
+        z = 1.26 + 0.16 * math.sin(a * 2)
+        ico((x, y, z), r=0.090, sub=1, scale=(1.0, 1.12, 1.0), m=BONEL)
+        ico((x - 0.033, y - 0.068, z + 0.012), r=0.028, sub=1, m=EYE)
+        ico((x + 0.033, y - 0.068, z + 0.012), r=0.028, sub=1, m=EYE)
+
+    root = assemble("BoneTyrant", 2.0)
+
+    # The skulls wind up with the swing, snap inward on the strike, then drift
+    # back out — one full turn over the loop so the ring never jumps.
+    key('wards', 1)
+    key('wards', 7, rot=(0, 0, -0.85), scale=1.20)
+    key('wards', 12, rot=(0, 0, 0.55), scale=0.62)
+    key('wards', 17, rot=(0, 0, 1.45), scale=1.06)
+    key('wards', LAST, rot=(0, 0, 2 * PI))
+    # The jaw drops on the wind-up and clacks shut on the hit.
+    hold(['jaw'], [1])
+    key('jaw', 7, rot=(0.52, 0, 0))
+    key('jaw', 12, rot=(0.10, 0, 0))
+    hold(['jaw'], [LAST])
+    anim_overhead_chop(reach=0.30, lean=0.38)
+    export(root, "bonetyrant_attack.glb")
+    return 12
+
+
 BUILDERS = [build_goblin_warrior, build_goblin_marauder, build_orc, build_orc_berserker,
             build_specter, build_wisp_specter, build_hollow_specter, build_wraith_elite,
-            build_wraith_sovereign, build_elder_dragon]
+            build_wraith_sovereign, build_bone_tyrant]
 
 
 # --------------------------------------------------------------------------
@@ -990,6 +1105,7 @@ BUILD_NAMES = {
     "build_hollow_specter": "hollowspecter",
     "build_wraith_elite": "wraithelite",
     "build_wraith_sovereign": "wraithsovereign",
+    "build_bone_tyrant": "bonetyrant",
     "build_elder_dragon": "elderdragon",
 }
 
