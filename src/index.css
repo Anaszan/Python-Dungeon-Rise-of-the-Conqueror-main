@@ -2126,7 +2126,25 @@ canvas {
    window size. */
 .appearance-layout {
   display: grid;
+  /* An explicit track, not the implicit `auto` one.
+     `auto` sizes the column to its items' min-content, and the preview's
+     min-content is a <canvas> that three.js writes an explicit pixel width
+     onto from the size it has just measured (WebGLRenderer.setSize with
+     updateStyle, which r3f leaves on). So the column sized itself from the
+     canvas while the canvas sized itself from the column, and the preview
+     grew every time it was measured until it was far wider than the window.
+     Only phones saw it: from 900px up the rule below puts the preview in a
+     clamped second column, which is a definite width and breaks the circle.
+     minmax(0, 1fr) is that same definite width for the one-column case. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
+}
+
+/* Grid items are min-width: auto by default, which would put the same
+   min-content floor straight back under the track above. */
+.appearance-preview,
+.appearance-controls {
+  min-width: 0;
 }
 
 .appearance-preview-hint {
@@ -2251,6 +2269,10 @@ canvas {
 
 .accessory-row {
   display: flex;
+  /* Four class buttons are wider than a phone's content column, and the row
+     is inside a track that no longer stretches to fit them (see
+     .appearance-layout) — so they wrap instead of running off the edge. */
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -3287,5 +3309,59 @@ canvas {
   .level-banner-boss {
     padding: 1px 8px;
     font-size: 11px;
+  }
+}
+
+/* ── Full-screen panels on a phone ─────────────────────────────────────────
+   The three panels that take the whole window — sign-in, create character,
+   and the profile — all set their side gutters as a fraction of the viewport
+   (30vw for the first, 15vw for the other two). That is what gives a desktop
+   a readable column instead of a form stretched across 1900px, and it is the
+   wrong instinct entirely on a phone: a fraction of a small window is still
+   taken out of a small window. At 390px the sign-in form was left 156px to
+   live in — 60% of the screen was gutter.
+   A phone has no width to give away, so below 640px the gutter is a flat
+   16px and the content gets the rest. Same reason these sit at the end of
+   the file as the block above: `@media` adds no specificity, and
+   .profile-panel's own padding rules are further down than .auth-panel's. */
+@media (max-width: 640px) {
+  .auth-panel,
+  .customize-panel,
+  .profile-panel {
+    padding-top: calc(28px + env(safe-area-inset-top));
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+    padding-left: calc(16px + env(safe-area-inset-left));
+    padding-right: calc(16px + env(safe-area-inset-right));
+  }
+
+  /* Both headings are sized for a desktop panel and are the widest piece of
+     text on either screen. */
+  .auth-panel h1,
+  .customize-panel h1 {
+    font-size: 20px;
+  }
+
+  /* The portrait is 84px of a ~358px row, which leaves the name and stats
+     beside it a column too narrow to read. The stats go under the name
+     rather than on one line with it. */
+  .profile-header {
+    gap: 12px;
+  }
+
+  .profile-stats-row {
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+
+  /* "ด่าน 1: ทางเดินมืด" and its count are a flex pair with nothing telling
+     them which one gives way; the count is the short, fixed one, so the name
+     is the one that wraps. */
+  .profile-level-row > span:first-child {
+    min-width: 0;
+  }
+
+  .profile-level-row > span:last-child {
+    flex: none;
+    white-space: nowrap;
   }
 }
