@@ -1,6 +1,7 @@
 import type { CodeCheck, LessonData } from './lessons'
 import { pickVariant } from './lessons'
 import { parseBlanks, type BlankTemplate } from './blanks'
+import { composeSlots, slotsOf, type SlotTemplate } from './slots'
 import type { Difficulty } from './difficulty'
 
 // The hard-mode content: one โจทย์ ("trial") per code box per monster.
@@ -21,8 +22,8 @@ export type TrialSpec = {
   // make a failing test say which trial is broken.
   id: string
   title: string
-  // What the monster demands, one requirement per line. Also becomes the
-  // comment header the editor starts with (see trialStarterCode).
+  // What the monster demands, one requirement per line. Each one also becomes
+  // a labelled write-in box in the editor (see trialSlots / slots.ts).
   brief: string[]
   // Every one of these must match the player's (comment-stripped) source
   // before the spell can be cast. Never global — see CodeCheck.
@@ -595,30 +596,19 @@ export const ALL_TRIAL_SETS: { chapter: number; trials: TrialSet }[] = Object.en
   .map(([chapter, trials]) => ({ chapter: Number(chapter), trials }))
   .sort((a, b) => a.chapter - b.chapter)
 
-// The editor in hard mode starts with the โจทย์ written out as comments and
-// nothing else — no code to lean on, which is the entire point. The brief is
-// also rendered above the box (TrialBrief); this is the copy of it that sits
-// in the editor, next to what the player types.
-//
-// Every requirement gets its own slot: the demand on one line, an arrow on
-// the next, and two empty lines under that to write in. It used to list all
-// the demands in a block at the top and then offer a single
-// "เขียนคาถาของเจ้าเองใต้บรรทัดนี้" marker at the bottom, which said where to
-// start but nothing about which part of the spell went where — so three
-// numbered demands landed in one undivided space and the player had to hold
-// the mapping in their head. Easy mode marks the exact spot for every answer
-// (blanks.ts); this is as close as hard mode gets to that without writing
-// any of the code for them.
+// The โจทย์ turned into the editor's write-in slots: one box per demand, with
+// the demand itself as that box's label. See slots.ts for why hard mode is
+// split up this way rather than handed one empty textarea.
+export function trialSlots(trial: TrialSpec): SlotTemplate {
+  return slotsOf(trial.title, trial.brief)
+}
+
+// What a hard-mode box holds before the player has written anything: the
+// โจทย์ as comments and nothing else — no code to lean on, which is the entire
+// point. Every later keystroke recomposes this same shape with the answers
+// filled in (composeSlots).
 export function trialStarterCode(trial: TrialSpec): string {
-  const lines = [
-    `# โจทย์จากมอนสเตอร์: ${trial.title}`,
-    '# กล่องนี้ว่างไว้ให้เจ้าเขียนเองทั้งหมด — เขียนใต้ลูกศรของแต่ละข้อ',
-    '',
-  ]
-  for (const [i, demand] of trial.brief.entries()) {
-    lines.push(`# ${i + 1}) ${demand}`, '# ↓', '', '')
-  }
-  return lines.join('\n')
+  return composeSlots(trialSlots(trial), [])
 }
 
 // Checks read the player's source, and the starter code hands them a comment
@@ -794,15 +784,16 @@ export function bossTrial(lesson: LessonData, kind: 'attack' | 'skill'): TrialSp
 // What one code box should start out holding, and which of the two kinds of
 // box it is.
 //
-// Exactly one of the two is ever set. `trial` is the hard-mode / boss case:
-// a written โจทย์, an editor that starts empty, and checks that gate the
-// cast. `blanks` is the easy-mode case: the chapter's skeleton split on its
-// `___` markers, which the UI renders as read-only code with an input box
-// where each blank was, so the only thing the player can touch is the answer
-// (see blanks.ts).
+// Exactly one of the two editors is ever set. `trial` + `slots` is the
+// hard-mode / boss case: a written โจทย์, one empty write-in box per demand,
+// and checks that gate the cast (see slots.ts). `blanks` is the easy-mode
+// case: the chapter's skeleton split on its `___` markers, which the UI
+// renders as read-only code with an input box where each blank was, so the
+// only thing the player can touch is the answer (see blanks.ts).
 export type SpellTask = {
   code: string
   trial: TrialSpec | null
+  slots: SlotTemplate | null
   blanks: BlankTemplate | null
 }
 
@@ -810,7 +801,13 @@ export type SpellTask = {
 // fill-in-the-blank editor needs.
 function skeletonTask(skeletons: string[], seed: string): SpellTask {
   const code = pickVariant(skeletons, seed)
-  return { code, trial: null, blanks: parseBlanks(code) }
+  return { code, trial: null, slots: null, blanks: parseBlanks(code) }
+}
+
+// Hard mode's half: the โจทย์, and the empty slots its demands become.
+function trialTask(trial: TrialSpec): SpellTask {
+  const slots = trialSlots(trial)
+  return { code: composeSlots(slots, []), trial, slots, blanks: null }
 }
 
 export function pickSpellTask(
@@ -826,7 +823,7 @@ export function pickSpellTask(
 
   if (isBoss) {
     const trial = bossTrial(lesson, kind)
-    if (trial) return { code: trialStarterCode(trial), trial, blanks: null }
+    if (trial) return trialTask(trial)
   }
 
   if (difficulty !== 'hard') return skeletonTask(skeletons, seed)
@@ -838,6 +835,5 @@ export function pickSpellTask(
   // levels.test.ts fails the build before that can ship.
   if (!variants || variants.length === 0) return skeletonTask(skeletons, seed)
 
-  const trial = pickVariant(variants, seed)
-  return { code: trialStarterCode(trial), trial, blanks: null }
+  return trialTask(pickVariant(variants, seed))
 }

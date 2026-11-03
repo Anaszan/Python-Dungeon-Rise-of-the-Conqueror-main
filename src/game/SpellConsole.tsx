@@ -3,6 +3,7 @@ import { castSpell, getPyodide } from './pyodideRuntime'
 import type { LessonData } from './lessons'
 import { missingCheck, pickSpellTask, type SpellTask } from './trials'
 import { fillBlanks, unfilledBlanks, type BlankTemplate } from './blanks'
+import { composeSlots, emptySlots, type SlotTemplate } from './slots'
 import { TrialBrief } from './TrialBrief'
 import type { Difficulty } from './difficulty'
 
@@ -42,14 +43,32 @@ function insertTab(code: string, el: HTMLTextAreaElement): { next: string; caret
   return { next: code.slice(0, start) + '    ' + code.slice(end), caret: start + 4 }
 }
 
+// Tab inserts four spaces instead of leaving the box — Python is written here,
+// and a key that jumps focus away mid-block is worse than useless. Shared by
+// every editor on this panel (the one-box textarea and each write-in slot).
+function tabToIndent(
+  e: KeyboardEvent<HTMLTextAreaElement>,
+  value: string,
+  onChange: (next: string) => void,
+) {
+  if (e.key !== 'Tab') return
+  e.preventDefault()
+  const el = e.currentTarget
+  const { next, caret } = insertTab(value, el)
+  onChange(next)
+  requestAnimationFrame(() => {
+    el.selectionStart = el.selectionEnd = caret
+  })
+}
+
 export type BoxState = {
-  // What actually gets cast. In hard mode the player types it directly; in
-  // easy mode it is recomposed from the skeleton and the blanks below every
-  // time one of them is answered, so everything downstream — the run, the
-  // trial checks, the log — sees one kind of thing either way.
+  // What actually gets cast. Recomposed from `answers` every time one of them
+  // changes — out of the skeleton in easy mode, out of the โจทย์'s slots in
+  // hard mode — so everything downstream (the run, the trial checks, the log)
+  // sees one kind of thing either way.
   code: string
-  // Easy mode only: one entry per `___` in the skeleton, in order. Empty for
-  // a hard-mode or boss box, which has no blanks to answer.
+  // One entry per thing the player has to supply, in order: per `___` in
+  // easy mode's skeleton, per demand in hard mode's โจทย์.
   answers: string[]
   casting: boolean
   log: string[]
@@ -61,20 +80,29 @@ export type BoxState = {
 function freshBox(task: SpellTask): BoxState {
   return {
     code: task.code,
-    answers: task.blanks ? Array<string>(task.blanks.count).fill('') : [],
+    answers: Array<string>(answerCount(task)).fill(''),
     casting: false,
     log: [],
     error: null,
   }
 }
 
-// Answering one blank: the box keeps the answers, and `code` is rebuilt from
-// them so the rest of the console never has to know which kind of box this
-// was.
+// Not exported for the same reason as the rest of this file's helpers.
+// PracticeConsole keeps its own copy of these three.
+function answerCount(task: SpellTask): number {
+  if (task.blanks) return task.blanks.count
+  if (task.slots) return task.slots.labels.length
+  return 0
+}
+
+// Answering one blank or writing in one slot: the box keeps the answers, and
+// `code` is rebuilt from them so the rest of the console never has to know
+// which kind of box this was.
 function withAnswer(box: BoxState, task: SpellTask, index: number, value: string): BoxState {
-  if (!task.blanks) return box
   const answers = box.answers.map((a, i) => (i === index ? value : a))
-  return { ...box, answers, code: fillBlanks(task.blanks, answers) }
+  if (task.blanks) return { ...box, answers, code: fillBlanks(task.blanks, answers) }
+  if (task.slots) return { ...box, answers, code: composeSlots(task.slots, answers) }
+  return box
 }
 
 // The message a box shows instead of casting when the player has not filled
@@ -211,6 +239,7 @@ export function SpellConsole({
         state={attackBox}
         brief={attackTask.trial && <TrialBrief trial={attackTask.trial} code={attackBox.code} />}
         blanks={attackTask.blanks}
+        slots={attackTask.slots}
         onChange={(code) => setAttackBox({ ...attackBox, code })}
         onAnswer={(i, value) => setAttackBox(withAnswer(attackBox, attackTask, i, value))}
         onRun={() => run(attackBox, setAttackBox, attackTask)}
@@ -233,6 +262,7 @@ export function SpellConsole({
         state={skillBox}
         brief={skillTask.trial && <TrialBrief trial={skillTask.trial} code={skillBox.code} />}
         blanks={skillTask.blanks}
+        slots={skillTask.slots}
         onChange={(code) => setSkillBox({ ...skillBox, code })}
         onAnswer={(i, value) => setSkillBox(withAnswer(skillBox, skillTask, i, value))}
         onRun={() => run(skillBox, setSkillBox, skillTask)}
@@ -309,11 +339,70 @@ function FillInCode({
   )
 }
 
+// Hard mode's editor: one write-in box per demand on the monster's โจทย์.
+//
+// The player still writes every line of the spell — nothing is filled in for
+// them — but each demand now has its own box with the demand itself printed
+// on it, instead of three numbered requirements and one undivided textarea.
+// Boxes are full multi-line editors, so writing the whole spell in the first
+// one and leaving the rest empty is still allowed: what gates the cast is the
+// โจทย์'s checks, never which box the lines were typed into (see slots.ts).
+function WriteInSlots({
+  template,
+  answers,
+  onAnswer,
+  disabled,
+  compact,
+}: {
+  template: SlotTemplate
+  answers: string[]
+  onAnswer: (index: number, value: string) => void
+  disabled: boolean
+  compact: boolean
+}) {
+  const left = emptySlots(template, answers)
+
+  return (
+    <div className="slot-code">
+      <p className="slot-code-hint">
+        {left === 0
+          ? '✓ เขียนครบทุกช่องแล้ว'
+          : `✎ เขียนคาถาเองในช่องของแต่ละข้อ — ยังว่างอยู่ ${left} ช่อง`}
+      </p>
+      {template.labels.map((label, i) => {
+        const value = answers[i] ?? ''
+        const lines = value === '' ? 0 : value.split('\n').length
+        return (
+          <div key={i} className={`slot-row${value.trim() === '' ? ' slot-row-empty' : ''}`}>
+            <p className="slot-label">
+              <span className="slot-num">{i + 1}</span> {label}
+            </p>
+            <textarea
+              className="slot-input"
+              value={value}
+              onChange={(e) => onAnswer(i, e.target.value)}
+              onKeyDown={(e) => tabToIndent(e, value, (next) => onAnswer(i, next))}
+              disabled={disabled}
+              spellCheck={false}
+              autoComplete="off"
+              aria-label={`ช่องเขียนคาถาข้อที่ ${i + 1}: ${label}`}
+              // Grows with what is typed — a box that scrolls at two lines
+              // would hide the block the player is in the middle of writing.
+              rows={Math.min(compact ? 8 : 12, Math.max(2, lines + 1))}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function CodeBox({
   title,
   state,
   brief,
   blanks = null,
+  slots = null,
   onChange,
   onAnswer,
   onRun,
@@ -326,9 +415,10 @@ export function CodeBox({
   // Hard mode's โจทย์ panel, rendered between the title and the editor. Left
   // out entirely in easy mode, where the skeleton itself is the instruction.
   brief?: ReactNode
-  // Set in easy mode only, and what decides which of the two editors this
-  // box is: fill-in-the-blanks when present, a free textarea when not.
+  // Easy mode only: fill-in-the-blanks over read-only code.
   blanks?: BlankTemplate | null
+  // Hard mode / boss only: one write-in box per demand on the โจทย์.
+  slots?: SlotTemplate | null
   onChange: (code: string) => void
   onAnswer?: (index: number, value: string) => void
   onRun: () => void
@@ -336,33 +426,28 @@ export function CodeBox({
   disabled: boolean
   compact?: boolean
 }) {
-  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key !== 'Tab') return
-    e.preventDefault()
-    const el = e.currentTarget
-    const { next, caret } = insertTab(state.code, el)
-    onChange(next)
-    requestAnimationFrame(() => {
-      el.selectionStart = el.selectionEnd = caret
-    })
-  }
-
   return (
     <div className={`spell-box${compact ? ' spell-box-compact' : ''}`}>
       <p className="spell-console-label">{title}</p>
       {brief}
       {blanks && blanks.count > 0 && onAnswer ? (
         <FillInCode template={blanks} answers={state.answers} onAnswer={onAnswer} disabled={state.casting} />
+      ) : slots && slots.labels.length > 0 && onAnswer ? (
+        <WriteInSlots
+          template={slots}
+          answers={state.answers}
+          onAnswer={onAnswer}
+          disabled={state.casting}
+          compact={compact}
+        />
       ) : (
         <textarea
           className="spell-textarea"
           value={state.code}
           onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => tabToIndent(e, state.code, onChange)}
           spellCheck={false}
           disabled={state.casting}
-          // Hard mode's editor starts with the โจทย์ as comments and the whole
-          // spell still to write, so it gets more room than a one-blank skeleton.
           rows={compact ? (brief ? 9 : 5) : brief ? 12 : 6}
         />
       )}

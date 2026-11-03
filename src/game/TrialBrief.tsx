@@ -7,6 +7,10 @@ import { remainingChecks, stripComments, type TrialSpec } from './trials'
 // borrows its CSS), which is deliberate — hard mode is "every fight is a small
 // exam".
 //
+// The demands themselves are not listed here any more: each one is now
+// printed on the write-in box that answers it (see WriteInSlots), and listing
+// them twice on one panel only pushed the boxes further down the screen.
+//
 // The checklist reads comment-stripped source (see stripComments) so the
 // โจทย์ written into the starter code as comments does not tick its own boxes.
 export function TrialBrief({ trial, code }: { trial: TrialSpec; code: string }) {
@@ -17,11 +21,6 @@ export function TrialBrief({ trial, code }: { trial: TrialSpec; code: string }) 
   return (
     <div className="trial-brief">
       <p className="trial-brief-title">📜 โจทย์: {trial.title}</p>
-      {trial.brief.map((line, i) => (
-        <p key={i} className="exam-brief-line">
-          {i + 1}. {line}
-        </p>
-      ))}
       <div className="exam-checks">
         {trial.checks.map((check) => {
           const ok = check.pattern.test(source)
@@ -43,17 +42,13 @@ export function TrialBrief({ trial, code }: { trial: TrialSpec; code: string }) 
         </div>
       )}
 
-      {/* The last thing before the editor, and the thing that labels it.
-          Hard mode's box is empty on purpose, which left it looking like a
-          scratch pad rather than the answer sheet — easy mode marks every
-          spot it wants filled (see .fill-code-hint), and this is the same
-          sentence for a box where the spot is "all of it". The count is the
+      {/* The last thing before the editor, and the thing that labels it: the
           checklist above, said again at the moment the player's eyes are
-          already on the box. */}
+          already on the boxes. */}
       <p className={`write-here${remaining === 0 ? ' write-here-done' : ''}`}>
         {remaining === 0
           ? '✓ ครบทุกข้อแล้ว กดร่ายคาถาได้เลย'
-          : `✍ เขียนคาถาเองทั้งหมดในกล่องข้างล่าง — ยังขาดอีก ${remaining} ข้อ`}
+          : `✍ เขียนคาถาเองลงในช่องของแต่ละข้อข้างล่าง — ยังขาดอีก ${remaining} ข้อ`}
       </p>
     </div>
   )

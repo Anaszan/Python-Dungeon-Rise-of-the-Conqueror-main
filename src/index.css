@@ -654,6 +654,95 @@ canvas {
   }
 }
 
+/* Hard mode's write-in editor (WriteInSlots): the same dark panel as the two
+   editors above, divided into one labelled box per demand on the โจทย์. The
+   player writes every line here — what the panel supplies is the division and
+   the labels, not the code. */
+.slot-code {
+  width: 100%;
+  padding: 8px 12px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--gold-dim);
+  background: var(--wood-dark);
+  box-sizing: border-box;
+}
+
+.slot-code-hint {
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(201, 162, 74, 0.25);
+  font-size: 11.5px;
+  color: var(--gold);
+}
+
+.slot-row + .slot-row {
+  margin-top: 10px;
+}
+
+.slot-label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--parchment-text);
+}
+
+/* The number is the only tie between a box and the checklist above it, so it
+   gets to be a coin rather than a character in the sentence. */
+.slot-num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--wood-dark);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.slot-input {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  box-sizing: border-box;
+  border-radius: 5px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(0, 0, 0, 0.35);
+  color: #cfe9c8;
+  font-family: ui-monospace, SFMono-Regular, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 4;
+  resize: vertical;
+}
+
+.spell-box-compact .slot-input {
+  font-size: 12px;
+}
+
+.slot-input:focus {
+  outline: none;
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 3px rgba(240, 200, 90, 0.22);
+}
+
+.slot-input:disabled {
+  opacity: 0.6;
+}
+
+/* A box with nothing in it yet is dashed and gold-tinted — the same "still
+   waiting for you" easy mode gives an unanswered blank, at the size of a
+   whole box. No pulse: several of these are on screen at once and they are
+   large, where .fill-blank-empty is one small target in a wall of code. */
+.slot-row-empty .slot-input {
+  border-style: dashed;
+  background: rgba(240, 200, 90, 0.05);
+}
+
 .spell-log {
   margin-top: 8px;
   padding: 8px 12px;
@@ -1911,13 +2000,6 @@ canvas {
   color: var(--parchment-dim);
 }
 
-.exam-brief-line {
-  margin: 0 0 6px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--parchment-text);
-}
-
 .exam-checks {
   margin-top: 12px;
   padding-top: 10px;
@@ -2356,8 +2438,9 @@ canvas {
    The picker shown between character creation and the first chapter, the
    compact switch on the pause menu, and the โจทย์ panel hard mode puts on top
    of every code box. The trial panel deliberately borrows the exam's
-   checklist styles (.exam-check*, .exam-brief-line, .exam-hints) — a hard-mode
-   fight is meant to look like a small end-of-level exam. */
+   checklist styles (.exam-check*, .exam-hints) — a hard-mode fight is meant
+   to look like a small end-of-level exam. The โจทย์'s demands themselves live
+   on the editor's own boxes (.slot-label), not in this panel. */
 
 .difficulty-panel {
   gap: 4px;
@@ -2526,8 +2609,8 @@ canvas {
   max-width: none;
 }
 
-/* The strip that labels hard mode's empty editor, sitting at the very bottom
-   of the brief so it reads straight into the box underneath. Negative margin
+/* The strip that labels hard mode's write-in boxes, sitting at the very
+   bottom of the brief so it reads straight into them. Negative margin
    because the brief has 10px of its own below it: this one tucks right up
    against the editor instead, which is how it reads as that box's caption
    and not as another line of the brief. Gold like easy mode's

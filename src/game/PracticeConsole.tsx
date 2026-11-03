@@ -4,18 +4,21 @@ import type { LessonData } from './lessons'
 import { CodeBox, type BoxState } from './SpellConsole'
 import { pickSpellTask, type SpellTask } from './trials'
 import { fillBlanks, unfilledBlanks } from './blanks'
+import { composeSlots } from './slots'
 import { TrialBrief } from './TrialBrief'
 import { type Difficulty } from './difficulty'
 
 const DUMMY_MAX_HP = 50
 const DUMMY_NAME = 'หุ่นฝึกซ้อม'
 
-// Same shape SpellConsole builds: the composed code plus, in easy mode, one
-// answer slot per blank in the skeleton.
+// Same shape SpellConsole builds: the composed code plus one answer slot per
+// thing the player supplies — a blank in easy mode, a demand of the โจทย์ in
+// hard mode.
 function freshBox(task: SpellTask): BoxState {
+  const count = task.blanks ? task.blanks.count : (task.slots?.labels.length ?? 0)
   return {
     code: task.code,
-    answers: task.blanks ? Array<string>(task.blanks.count).fill('') : [],
+    answers: Array<string>(count).fill(''),
     casting: false,
     log: [],
     error: null,
@@ -23,9 +26,10 @@ function freshBox(task: SpellTask): BoxState {
 }
 
 function withAnswer(box: BoxState, task: SpellTask, index: number, value: string): BoxState {
-  if (!task.blanks) return box
   const answers = box.answers.map((a, i) => (i === index ? value : a))
-  return { ...box, answers, code: fillBlanks(task.blanks, answers) }
+  if (task.blanks) return { ...box, answers, code: fillBlanks(task.blanks, answers) }
+  if (task.slots) return { ...box, answers, code: composeSlots(task.slots, answers) }
+  return box
 }
 
 // A safe practice fight shown on ChapterIntro before the player ever steps
@@ -153,6 +157,7 @@ export function PracticeConsole({
           state={attackBox}
           brief={briefOf(attackTask, attackBox.code)}
           blanks={attackTask.blanks}
+          slots={attackTask.slots}
           onChange={(code) => setAttackBox({ ...attackBox, code })}
           onAnswer={(i, value) => setAttackBox(withAnswer(attackBox, attackTask, i, value))}
           onRun={() => run(attackBox, setAttackBox, attackTask)}
@@ -164,6 +169,7 @@ export function PracticeConsole({
           state={skillBox}
           brief={briefOf(skillTask, skillBox.code)}
           blanks={skillTask.blanks}
+          slots={skillTask.slots}
           onChange={(code) => setSkillBox({ ...skillBox, code })}
           onAnswer={(i, value) => setSkillBox(withAnswer(skillBox, skillTask, i, value))}
           onRun={() => run(skillBox, setSkillBox, skillTask)}
