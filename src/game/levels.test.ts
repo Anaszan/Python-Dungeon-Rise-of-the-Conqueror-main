@@ -49,6 +49,32 @@ describe('campaign', () => {
     expect(LEVELS.map((l) => l.level)).toEqual(LEVELS.map((_, i) => i + 1))
   })
 
+  it('sends every chapter somewhere real to read more', () => {
+    // These are the one place in the game that points off-site, and a dead
+    // one is worse than none: a player who clicks it has been told the
+    // explanation is over there. The urls themselves were checked against
+    // the live site when they were written (every one answered 200) —
+    // nothing here can re-check that, so what this holds is the shape:
+    // https, the W3Schools Python tutorial, no duplicates, and a Thai label
+    // on each so the link is findable from the chapter's own vocabulary.
+    const seen = new Set<string>()
+    for (const lesson of LESSONS) {
+      const where = `chapter ${lesson.chapter}`
+      expect(lesson.readMore.length, where).toBeGreaterThan(0)
+      for (const link of lesson.readMore) {
+        expect(link.label.trim(), where).not.toBe('')
+        expect(link.url, `${where}: ${link.label}`).toMatch(
+          /^https:\/\/www\.w3schools\.com\/python\/[\w-]+\.asp$/,
+        )
+        // Within one chapter a repeat is a copy-paste slip; across chapters
+        // it means two chapters are pointing at the same explanation, which
+        // is a sign the link was never chosen for the second one.
+        expect(seen.has(link.url), `${link.url} is linked twice`).toBe(false)
+        seen.add(link.url)
+      }
+    }
+  })
+
   it('keeps monster ids unique across every level', () => {
     // ALL_MONSTERS is looked up by id alone (see levels.ts), so a duplicate
     // would silently make two different monsters share one HP pool and one

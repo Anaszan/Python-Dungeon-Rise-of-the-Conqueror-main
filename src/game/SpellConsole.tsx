@@ -3,7 +3,7 @@ import { castSpell, getPyodide } from './pyodideRuntime'
 import type { LessonData } from './lessons'
 import { missingCheck, pickSpellTask, type SpellTask } from './trials'
 import { fillBlanks, unfilledBlanks, type BlankTemplate } from './blanks'
-import { composeSlots, emptySlots, type SlotTemplate } from './slots'
+ import { composeSlots, emptySlots, type SlotTemplate } from './slots'
 import { TrialBrief } from './TrialBrief'
 import type { Difficulty } from './difficulty'
 

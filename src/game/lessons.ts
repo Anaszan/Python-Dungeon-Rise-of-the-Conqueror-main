@@ -12,6 +12,21 @@ export type CodeCheck = {
   pattern: RegExp
 }
 
+// One "go and read the real thing" link on the chapter screen.
+//
+// The game teaches each chapter in a few lines from a wizard and a table of
+// terms, which is enough to get through the level and nowhere near a full
+// account of the syntax. These point at W3Schools' Python tutorial — free, no
+// account, and a runnable example on every page — so a player who wants the
+// whole story has somewhere to go that is not this game.
+//
+// `label` is the Thai name of the idea, not the page's English title: the
+// link has to be findable by someone scanning the chapter's own vocabulary.
+export type ReadMoreLink = {
+  label: string
+  url: string
+}
+
 export type LessonData = {
   chapter: number
   chapterTitle: string
@@ -26,6 +41,9 @@ export type LessonData = {
   // to the practice exercise. Includes the expected output as a trailing
   // comment so looking at it is enough — no need to actually run it.
   exampleCode: string
+  // Where to read more about this chapter, shown under the example on
+  // ChapterIntro. Every url is checked by levels.test.ts; see ReadMoreLink.
+  readMore: ReadMoreLink[]
   // Fill-in-the-blank starting code for each of the two SpellConsole boxes.
   //
   // Each `___` is a hole the player answers. They are not placeholder text
@@ -79,6 +97,12 @@ gold = 50
 print(f"{name} มีทอง {gold} เหรียญ")
 # ผลลัพธ์: นักรบเวท มีทอง 50 เหรียญ
 `,
+    readMore: [
+      { label: 'ตัวแปร (Variables)', url: 'https://www.w3schools.com/python/python_variables.asp' },
+      { label: 'ชนิดข้อมูล (Data Types)', url: 'https://www.w3schools.com/python/python_datatypes.asp' },
+      { label: 'ตัวเลข int / float', url: 'https://www.w3schools.com/python/python_numbers.asp' },
+      { label: 'แสดงผลด้วย print()', url: 'https://www.w3schools.com/python/python_variables_output.asp' },
+    ],
     // Three variants each, mixing "fill a number" and "fill a variable
     // name" blanks so the exercise doesn't feel identical against every one
     // of level 1's 9 monsters — see pickVariant() above.
@@ -141,6 +165,11 @@ else:
     print("เลือดยังเยอะอยู่")
 # ผลลัพธ์: ระวัง! เลือดเหลือน้อย
 `,
+    readMore: [
+      { label: 'เงื่อนไข if / elif / else', url: 'https://www.w3schools.com/python/python_conditions.asp' },
+      { label: 'ตัวดำเนินการเปรียบเทียบ และ and / or', url: 'https://www.w3schools.com/python/python_operators.asp' },
+      { label: 'ค่าจริง-เท็จ (Booleans)', url: 'https://www.w3schools.com/python/python_booleans.asp' },
+    ],
     attackSkeletons: [
       `damage = atk
 
@@ -184,6 +213,11 @@ skill(power)
 # โจมตีครั้งที่ 2
 # โจมตีครั้งที่ 3
 `,
+    readMore: [
+      { label: 'ลูป for', url: 'https://www.w3schools.com/python/python_for_loops.asp' },
+      { label: 'ลูป while', url: 'https://www.w3schools.com/python/python_while_loops.asp' },
+      { label: 'ฟังก์ชัน range()', url: 'https://www.w3schools.com/python/ref_func_range.asp' },
+    ],
     attackSkeletons: [
       `# โจมตีคอมโบ 3 ครั้งติด ครั้งละ 1 ใน 3 ของพลังโจมตี
 for i in range(___):  # TODO: ใส่จำนวนครั้งที่ต้องการโจมตีซ้ำ
@@ -220,6 +254,10 @@ while remaining ___ 20:  # TODO: ใส่เงื่อนไขให้ว�
 print(heal(10))
 # ผลลัพธ์: 20
 `,
+    readMore: [
+      { label: 'ฟังก์ชัน (def / return)', url: 'https://www.w3schools.com/python/python_functions.asp' },
+      { label: 'ขอบเขตของตัวแปร (Scope)', url: 'https://www.w3schools.com/python/python_scope.asp' },
+    ],
     attackSkeletons: [
       `# สร้างฟังก์ชันคาถาโจมตีของเจ้าเอง
 def fireball(power):
@@ -259,6 +297,11 @@ with open("note.txt", "r") as f:
     print(f.read())
 # ผลลัพธ์: บันทึกไว้แล้ว
 `,
+    readMore: [
+      { label: 'การจัดการไฟล์ (File Handling)', url: 'https://www.w3schools.com/python/python_file_handling.asp' },
+      { label: 'เปิดและอ่านไฟล์', url: 'https://www.w3schools.com/python/python_file_open.asp' },
+      { label: 'เขียนและต่อท้ายไฟล์ ("w" / "a")', url: 'https://www.w3schools.com/python/python_file_write.asp' },
+    ],
     attackSkeletons: [
       `# จารึกพลังโจมตีลงตำราคาถา แล้วอ่านกลับมาร่าย
 with open("spellbook.txt", "w") as f:
@@ -307,6 +350,10 @@ except ZeroDivisionError:
     print("หารด้วยศูนย์ไม่ได้!")
 # ผลลัพธ์: หารด้วยศูนย์ไม่ได้!
 `,
+    readMore: [
+      { label: 'try / except / finally', url: 'https://www.w3schools.com/python/python_try_except.asp' },
+      { label: 'รายชื่อชนิดข้อผิดพลาดทั้งหมด', url: 'https://www.w3schools.com/python/python_ref_exceptions.asp' },
+    ],
     attackSkeletons: [
       `# เกราะของมอนสเตอร์ที่นี่มักถูกสาปจนเหลือ 0 — ระวังหารด้วยศูนย์!
 try:

@@ -1857,6 +1857,46 @@ canvas {
   white-space: pre;
 }
 
+/* "Go and read the real thing" — the chapter's syntax on W3Schools, one link
+   per idea. Chips rather than a list of underlined sentences: they sit
+   between the example and the practice box as one short row to scan, not as
+   a block of reading competing with the two things that teach. */
+.chapter-intro-links {
+  text-align: left;
+  margin: 18px 0;
+}
+
+.chapter-intro-links-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--parchment-dim);
+}
+
+.chapter-intro-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chapter-intro-link {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--gold);
+  font-size: 12.5px;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.chapter-intro-link:hover,
+.chapter-intro-link:focus-visible {
+  border-color: var(--gold-bright);
+  background: rgba(240, 200, 90, 0.1);
+  color: var(--gold-bright);
+}
+
 .practice-console {
   text-align: left;
   margin: 18px 0;

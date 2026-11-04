@@ -50,6 +50,32 @@ export function ChapterIntro({
             <code>{lesson.exampleCode}</code>
           </pre>
         </div>
+
+        {/* What this screen teaches is the minimum needed to get through the
+            level — a few lines from the wizard and a table of terms. These go
+            to the full account of the same syntax, between the example and
+            the practice box, which is where someone who wants more than the
+            minimum is standing. Opened in their own tab: the chapter screen
+            holds a live Pyodide runtime and a WebGL dummy, and losing those
+            to a navigation would mean warming them again on the way back. */}
+        <div className="chapter-intro-links">
+          <p className="chapter-intro-links-label">
+            🔗 อ่านเพิ่มเติมเรื่อง{lesson.chapterTitle} ที่ W3Schools (ภาษาอังกฤษ มีตัวอย่างให้กดลองรันในหน้าเว็บ)
+          </p>
+          <div className="chapter-intro-link-row">
+            {lesson.readMore.map((link) => (
+              <a
+                key={link.url}
+                className="chapter-intro-link"
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {link.label} ↗
+              </a>
+            ))}
+          </div>
+        </div>
         <PracticeConsole
           lesson={lesson}
           difficulty={difficulty}
