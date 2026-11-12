@@ -1,0 +1,112 @@
+#:schema https://supabase.com/schemas/config/v1.json
+# การตั้งค่า Supabase สำหรับรันทั้งกองบนเครื่องตัวเองด้วย Docker
+# (Supabase CLI + Docker — ดูวิธีใช้ที่ supabase/README.md)
+#
+# ไฟล์นี้เขียนเฉพาะค่าที่โปรเจกต์นี้ "ตั้งใจ" ให้ต่างจากค่าเริ่มต้น หรือค่าที่อยากให้เห็นชัด ๆ ว่าเปิดอยู่
+# ค่าอื่น ๆ ที่ไม่ได้เขียนไว้คือค่าเริ่มต้นของ CLI — รายการเต็มดูได้ที่
+# https://supabase.com/docs/guides/local-development/cli/config
+#
+# เวอร์ชัน CLI ที่ใช้ตอนสร้างไฟล์นี้: 3.1.0
+
+project_id = "python-dungeon"
+
+# ---------------------------------------------------------------------------
+# API (PostgREST) — ปลายทางที่ src/lib/supabase.ts เรียก
+# ---------------------------------------------------------------------------
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+# ---------------------------------------------------------------------------
+# ฐานข้อมูล Postgres
+# ---------------------------------------------------------------------------
+[db]
+port = 54322
+shadow_port = 54320
+# ต้องตรงกับเวอร์ชันของโปรเจกต์บนคลาวด์ถ้าจะใช้ db pull / db push ร่วมกัน
+# เช็กฝั่งคลาวด์ด้วย `SHOW server_version;`
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+# เปิดไว้: `supabase start` และ `supabase db reset` จะใส่บัญชีตัวอย่างให้เลย
+# (แอดมิน 1 + ผู้เล่น 3) ไม่ต้องมานั่งสมัครก่อนถึงจะเห็นกระดานอันดับมีข้อมูล
+enabled = true
+sql_paths = ["./seed.sql"]
+
+# ---------------------------------------------------------------------------
+# Auth (GoTrue)
+# ---------------------------------------------------------------------------
+[auth]
+enabled = true
+# ต้องเป็น origin ของ Vite dev server: authStore.ts กับ adminApi.ts ส่ง
+# `redirectTo: window.location.origin` ไปกับลิงก์รีเซ็ตรหัสผ่าน และ GoTrue
+# ปฏิเสธ redirect ที่ไม่อยู่ในลิสต์นี้
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173", "http://127.0.0.1:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+# ฟอร์มสมัคร (LoginScreen.tsx) และฟอร์มตั้งรหัสใหม่ใช้ minLength={8}
+# ตั้งให้ตรงกัน ฝั่งเซิร์ฟเวอร์จะได้ไม่ปล่อยรหัสที่ฝั่งหน้าเว็บไม่ยอมรับ
+minimum_password_length = 8
+
+[auth.email]
+enabled = true
+# ปิดการยืนยันอีเมล: signUp() ในเกมล็อกอินต่อทันทีหลังสมัครเสร็จ
+# ถ้าเปิดอันนี้ ผู้เล่นใหม่จะค้างอยู่หน้าล็อกอินจนกว่าจะไปกดลิงก์ใน Mailpit
+enable_confirmations = false
+max_frequency = "1s"
+
+[auth.sms]
+# เกมไม่ได้ส่ง SMS: เบอร์โทรที่กรอกตอนสมัครเก็บไว้ในตาราง user_contacts
+# ของเราเอง (migrations 004) ไม่ได้ผูกกับ phone auth ของ Supabase
+enabled = false
+
+# ---------------------------------------------------------------------------
+# เซิร์ฟเวอร์อีเมลสำหรับทดสอบ (Mailpit) — http://localhost:54324
+# อีเมลทุกฉบับที่ระบบส่ง (ลิงก์รีเซ็ตรหัสผ่าน) จะมาโผล่ที่นี่ ไม่ได้ออกไปข้างนอกจริง
+# ---------------------------------------------------------------------------
+[local_smtp]
+enabled = true
+port = 54324
+
+# ---------------------------------------------------------------------------
+# Studio — หน้าเว็บจัดการฐานข้อมูล http://localhost:54323
+# ---------------------------------------------------------------------------
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+# ---------------------------------------------------------------------------
+# บริการที่เหลือ เปิดไว้ครบตามที่อาจารย์ขอ ("ทุกฟังก์ชันของ Supabase")
+# เกมยังไม่ได้เรียกใช้สามอันล่างนี้ แต่สแต็กขึ้นครบและพร้อมใช้
+# ---------------------------------------------------------------------------
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[storage.s3_protocol]
+enabled = true
+
+[realtime]
+enabled = true
+
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+inspector_port = 8083
+deno_version = 2
+
+[analytics]
+enabled = true
+port = 54327
+backend = "postgres"

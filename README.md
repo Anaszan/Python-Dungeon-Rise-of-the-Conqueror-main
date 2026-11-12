@@ -110,22 +110,35 @@ src/
   lib/
     supabase.ts              สร้าง Supabase client จาก env vars
 
-supabase/
-  schema.sql                 schema หลัก: ตาราง profiles, game_saves, scores + RLS policies
-  migrations_002_player_stats.sql   เพิ่มคอลัมน์ player_hp / attack_power / collected_pickup_ids
-  migrations_003_levels_and_skill.sql   เพิ่มคอลัมน์ current_level / skill_cooldown
-  migrations_004_phone_nickname_login.sql   เพิ่ม profiles.nickname, ตาราง user_contacts (เบอร์โทร,
+supabase/                    โปรเจกต์ Supabase CLI — รันทั้งกองบนเครื่องด้วย Docker ได้
+                             (วิธีใช้ทั้งหมดอยู่ใน supabase/README.md)
+  README.md                  คู่มือรัน Supabase บนเครื่องตัวเอง: ลงอะไร สั่งอะไร เปิดดูที่ไหน
+                             บัญชีตัวอย่าง และวิธีพิสูจน์ว่า RLS/แอดมินกันจริง
+  config.toml                ตั้งค่าสแต็ก: พอร์ต, auth (site_url ชี้ที่ Vite 5173), อีเมลทดสอบ,
+                             storage, realtime, edge functions, analytics
+  seed.sql                   บัญชีตัวอย่าง 5 บัญชี (แอดมิน/ผู้เล่นสามระดับ/ผู้ถูกระงับ) + ความคืบหน้า
+                             รันอัตโนมัติตอน supabase start และ supabase db reset
+  migrations/                สคีมาทั้งหมด เรียงตามลำดับที่ต้องรัน — ไฟล์ชุดเดิม (schema.sql +
+                             migrations_0NN_*.sql) เนื้อในไม่ได้แก้ เปลี่ยนแค่ชื่อให้ CLI รู้จัก
+    ..._extensions.sql       สร้าง schema extensions + pgcrypto (admin_create_player ใช้ crypt())
+    ..._schema.sql           schema หลัก: ตาราง profiles, game_saves, scores + RLS policies
+    ..._player_stats.sql     เพิ่มคอลัมน์ player_hp / attack_power / collected_pickup_ids
+    ..._levels_and_skill.sql เพิ่มคอลัมน์ current_level / skill_cooldown
+    ..._phone_nickname_login.sql   เพิ่ม profiles.nickname, ตาราง user_contacts (เบอร์โทร,
                              ไม่ public) และฟังก์ชัน resolve_login_email / is_identifier_taken
                              สำหรับล็อกอินด้วยเบอร์โทร/ชื่อเล่น
-  migrations_005_character_selection.sql   เพิ่ม game_saves.character_class / game_saves.skin_color
+    ..._character_selection.sql    เพิ่ม game_saves.character_class / game_saves.skin_color
                              สำหรับเก็บอาชีพ/สีผิวที่เลือกไว้ถาวรต่อบัญชี
-  migrations_011_difficulty.sql   เพิ่ม game_saves.difficulty ('easy'/'hard'/null) สำหรับจำโหมดที่เลือกไว้
+    ..._difficulty.sql       เพิ่ม game_saves.difficulty ('easy'/'hard'/null) สำหรับจำโหมดที่เลือกไว้
                              — เกมยังเล่นได้ถ้ายังไม่รัน migration นี้ แค่จะถามโหมดใหม่ทุกเซสชัน
-  migrations_012_admin.sql   ระบบแอดมิน: ตาราง admin_emails (allow-list, RLS ปิดตาย เข้าถึงผ่านฟังก์ชันเท่านั้น),
+    ..._admin.sql            ระบบแอดมิน: ตาราง admin_emails (allow-list, RLS ปิดตาย เข้าถึงผ่านฟังก์ชันเท่านั้น),
                              ฟังก์ชัน is_admin() และ get_admin_player_overview() สำหรับแดชบอร์ดผู้เล่น
-  migrations_013_last_position.sql   เพิ่ม game_saves.last_position ({level, x, z}) จำตำแหน่งที่ยืนอยู่ ล็อกอินกลับมาอยู่ที่เดิม
-  migrations_014_admin_user_management.sql   ระบบจัดการผู้ใช้ของแอดมิน (เพิ่ม/แก้ไข/ลบ/ระงับ) + คอลัมน์
+    ..._last_position.sql    เพิ่ม game_saves.last_position ({level, x, z}) จำตำแหน่งที่ยืนอยู่ ล็อกอินกลับมาอยู่ที่เดิม
+    ..._admin_user_management.sql  ระบบจัดการผู้ใช้ของแอดมิน (เพิ่ม/แก้ไข/ลบ/ระงับ) + คอลัมน์
                              profiles.suspended_at และ RLS ที่ปฏิเสธการเขียนของผู้ถูกระงับ
+
+tools/
+  local-env.mjs              ถาม Supabase CLI ว่าสแต็กบนเครื่องใช้ URL/คีย์อะไร แล้วเขียน .env.local ให้
 ```
 
 ## กติกาเกม
@@ -398,7 +411,7 @@ Pyodide โหลดแบบ lazy จาก jsdelivr CDN (`https://cdn.jsdelivr
 
 ## ระบบแอดมิน (admin)
 
-`supabase/migrations_012_admin.sql` + `src/admin/` — บัญชีที่อยู่ใน allow-list จะได้เครื่องมือเพิ่มมา 2 อย่าง
+`supabase/migrations/20250101000012_admin.sql` + `src/admin/` — บัญชีที่อยู่ใน allow-list จะได้เครื่องมือเพิ่มมา 2 อย่าง
 
 - **วาร์ปข้ามด่าน**: กระโดดไปเริ่มด่านไหนก็ได้ทันที (`store.warpToLevel`) โดย **ไม่ล้างอะไรเลย** — HP, พลังโจมตี, มอนสเตอร์ที่ปราบ
   แล้ว และไอเทมที่เก็บแล้วติดตัวไปหมด วาร์ปกลับมาที่เดิมสถานะก็เหมือนเดิมเป๊ะ ถ้าด่านปลายทางถูกเคลียร์หมดแล้วจะพาไป
@@ -412,7 +425,7 @@ Pyodide โหลดแบบ lazy จาก jsdelivr CDN (`https://cdn.jsdelivr
 - **เข้าได้ 2 ทาง**: ปุ่มลอย 🛡 มุมซ้ายล่าง และเมนูหยุดชั่วคราว (โผล่เฉพาะแอดมิน) — แผงจะเรนเดอร์ที่ระดับ `App.tsx` จึงเปิดได้ทั้ง
   ตอนอยู่หน้า ChapterIntro และตอนอยู่ในดันเจี้ยน
 
-### จัดการผู้ใช้ (migrations_014)
+### จัดการผู้ใช้ (migration 014)
 
 ครบทั้ง 4 อย่างตามข้อกำหนด — **เพิ่ม / แก้ไข / ลบ / ระงับ** อยู่ในส่วน "จัดการผู้ใช้" ของแผงแอดมิน แต่ละปุ่มเรียก RPC ที่ตรวจ
 `is_admin()` ในฐานข้อมูลเอง
@@ -451,7 +464,12 @@ Function ที่เรียก `auth.admin.createUser` ส่วนที่�
 
 ## ระบบผู้ใช้และฐานข้อมูล (Supabase)
 
-ตั้งค่าโดยรัน `supabase/schema.sql` แล้วตามด้วย `supabase/migrations_002_player_stats.sql` และ `supabase/migrations_003_levels_and_skill.sql` ตามลำดับ ใน Supabase SQL Editor
+รันได้สองแบบ:
+
+- **บนเครื่องตัวเอง (Supabase CLI + Docker)** — `npm run local:up` ยกทั้งกองขึ้นแล้วชี้เกมมาที่นี่ให้เอง
+  มีบัญชีตัวอย่างพร้อมเล่น ไม่ต้องมีบัญชี Supabase เลย **วิธีทำทั้งหมดอยู่ที่ [`supabase/README.md`](supabase/README.md)**
+- **โปรเจกต์บนคลาวด์** — เอาไฟล์ใน `supabase/migrations/` ไปวางใน SQL Editor ทีละไฟล์ **เรียงตามชื่อ**
+  (ไฟล์ท้าย ๆ ที่ยังไม่รันจะทำให้บางฟีเจอร์ degrade อย่างสุภาพแทนที่จะพัง — ดูคอมเมนต์ใน `persistence.ts`)
 
 | ตาราง | หน้าที่ |
 |---|---|
@@ -466,17 +484,31 @@ session จะถูก sync อัตโนมัติผ่าน `onAuthStat
 
 **ล็อกอินด้วยเบอร์โทร/ชื่อเล่น**: Supabase Auth ผูกบัญชีกับอีเมลเป็นหลักเสมอ ตอนสมัครผู้เล่นต้องกรอกอีเมล+เบอร์โทร+ชื่อเล่นครบ
 ตอนล็อกอินกรอกได้ช่องเดียว (อีเมล/เบอร์โทร/ชื่อเล่น) — ถ้าไม่ใช่รูปแบบอีเมล ฝั่ง client จะเรียก RPC function
-`resolve_login_email` (นิยามใน `migrations_004_phone_nickname_login.sql`) เพื่อหาอีเมลจริงจากชื่อเล่น/เบอร์โทรก่อน แล้วค่อยเรียก
+`resolve_login_email` (นิยามใน `migrations/20250101000004_phone_nickname_login.sql`) เพื่อหาอีเมลจริงจากชื่อเล่น/เบอร์โทรก่อน แล้วค่อยเรียก
 `signInWithPassword` ตามปกติ ปุ่มออกจากระบบอยู่ที่ `LogoutButton.tsx` มุมบนขวาระหว่างเล่นเกม
 
 ## การตั้งค่าและรันโปรเจกต์
+
+### แบบที่ 1 — Supabase บนเครื่องตัวเอง (ต้องมี Docker) ← แนะนำสำหรับการตรวจงาน
+
+```bash
+npm install
+npm run local:up     # ยก Supabase ขึ้นด้วย Docker + เขียน .env.local ให้เอง
+npm run dev          # http://localhost:5173
+```
+
+ได้ฐานข้อมูลเปล่า ๆ ที่รัน migrations ครบ พร้อมบัญชีตัวอย่าง 5 บัญชี (แอดมิน / ผู้เล่นสามระดับ /
+ผู้ถูกระงับ) รายละเอียดทั้งหมด — ต้องลงอะไรก่อน, เปิด Studio/Mailpit ที่ไหน, รหัสผ่านของบัญชีตัวอย่าง,
+วิธีพิสูจน์ว่า RLS กันจริง — อยู่ที่ [`supabase/README.md`](supabase/README.md)
+
+### แบบที่ 2 — โปรเจกต์ Supabase บนคลาวด์
 
 1. คัดลอก `.env.example` เป็น `.env` แล้วใส่ค่าโปรเจกต์ Supabase:
    ```
    VITE_SUPABASE_URL=https://your-project.supabase.co
    VITE_SUPABASE_ANON_KEY=your-anon-key
    ```
-2. รัน SQL ใน `supabase/schema.sql` แล้วตามด้วยไฟล์ `supabase/migrations_002` … `migrations_011` **เรียงตามลำดับเลข** บน Supabase SQL Editor (ไฟล์ท้าย ๆ ที่ยังไม่รันจะทำให้บางฟีเจอร์ degrade อย่างสุภาพแทนที่จะพัง — ดูคอมเมนต์ใน `persistence.ts`)
+2. เอาไฟล์ใน `supabase/migrations/` ไปวางใน Supabase SQL Editor ทีละไฟล์ **เรียงตามชื่อ** (ไฟล์ท้าย ๆ ที่ยังไม่รันจะทำให้บางฟีเจอร์ degrade อย่างสุภาพแทนที่จะพัง — ดูคอมเมนต์ใน `persistence.ts`)
 3. ติดตั้ง dependencies และรัน dev server:
    ```
    npm install
@@ -488,7 +520,10 @@ session จะถูก sync อัตโนมัติผ่าน `onAuthStat
 - `npm run dev` — เริ่ม dev server (Vite)
 - `npm run build` — type-check (`tsc -b`) แล้ว build production
 - `npm run lint` — รัน oxlint
+- `npm run test` — รันเทสทั้งหมด (vitest)
 - `npm run preview` — พรีวิว production build
+- `npm run local:up` — `supabase start` + เขียน `.env.local` ชี้มาที่สแต็กบนเครื่อง
+- `npm run supabase:start` / `:stop` / `:status` / `:reset` / `:env` — คุม Supabase บนเครื่องทีละอย่าง
 
 ## สถานะปัจจุบัน / สิ่งที่ยังไม่ทำ
 
@@ -506,6 +541,55 @@ session จะถูก sync อัตโนมัติผ่าน `onAuthStat
 - โมเดลตัวละครใน `public/models/{warrior,cleric,wizard,rogue}/` เป็นชุด "LowPoly RPG Characters" โดย Quaternius สัญญาอนุญาต CC0 1.0 (ดู `License.txt` ในแต่ละโฟลเดอร์) ใช้แทนโมเดล capsule/สีเดิม เพื่อความสวยงามแบบแฟนตาซีใกล้เคียง Ragnarok — ไม่ใช่ asset ต้นฉบับของ Ragnarok Online ซึ่งมีลิขสิทธิ์และใช้ไม่ได้
 
 ## บันทึกการพัฒนา (Changelog)
+
+### 2026-11-12 — รัน Supabase ทั้งกองบนเครื่องตัวเองได้ (Supabase CLI + Docker)
+
+ก่อนหน้านี้โปรเจกต์ผูกกับ Supabase บนคลาวด์อย่างเดียว ใครจะรันต้องไปสมัครบัญชี สร้างโปรเจกต์
+แล้วเอา SQL 14 ไฟล์ไปวางใน SQL Editor ทีละไฟล์ด้วยมือ ตอนนี้ยกทั้งกองขึ้นบนเครื่องได้ด้วยคำสั่งเดียว
+
+- **`supabase/` กลายเป็นโปรเจกต์ Supabase CLI จริง ๆ** — เพิ่ม `config.toml` (เขียนจากของที่ CLI 3.1.0
+  สร้างให้ แล้วตัดเหลือเฉพาะค่าที่ตั้งใจตั้งเอง พร้อมคอมเมนต์ว่าทำไม)
+- **ย้าย SQL เข้า `supabase/migrations/` ด้วย `git mv`** — `schema.sql` + `migrations_0NN_*.sql`
+  กลายเป็น `20250101000NNN_<ชื่อ>.sql` ตามรูปแบบที่ CLI ต้องการ **เนื้อในทุกไฟล์ไม่ได้แก้สักตัวอักษร**
+  เลขท้ายยังตรงกับเลขเดิมทุกไฟล์ จะอ่านไล่ลำดับหรือเอาไปวางใน SQL Editor แบบเดิมก็ยังได้
+- **เพิ่ม migration 000 ตัวใหม่ตัวเดียว** (`extensions.sql`) — `create schema if not exists extensions`
+  + `create extension if not exists pgcrypto with schema extensions` ของเดิมเขียน `extensions.crypt(...)`
+  ใน `admin_create_player` โดยอาศัยว่าแพลตฟอร์มติดตั้งมาให้แล้ว ซึ่งจริงทั้งบนคลาวด์และในอิมเมจของ CLI
+  แต่ถ้าวันหนึ่งไม่จริง มันจะพังตอนแอดมินกดเพิ่มผู้ใช้ ไม่ใช่ตอนติดตั้ง — สองบรรทัดนี้ปิดช่องนั้นและเป็น no-op ทั้งคู่
+- **`supabase/seed.sql`** — บัญชีตัวอย่าง 5 บัญชี (แอดมิน / ผู้เล่นด่าน 1 / ด่าน 4 / ผู้พิชิต / ผู้ถูกระงับ)
+  พร้อมความคืบหน้าที่สมเหตุสมผล (คนอยู่ด่าน N ล้มบอสของด่าน 1..N-1 มาแล้ว ใช้ id จริงจาก `levels.ts`)
+  เปิดมาปุ๊บกระดานอันดับมีข้อมูล แผงแอดมินมีคนให้กดดู และมีบัญชีถูกระงับไว้ลองหน้าจอ
+  - แอดมินของเครื่องใช้อีเมลปลอม `admin@local.test` ที่ seed ใส่เข้า `admin_emails` เอง **ไม่ใช่**
+    อีเมลแอดมินตัวจริงใน migration 012 — อีเมลจริงจะได้ไม่มีรหัสผ่านที่เปิดเผยผูกอยู่ด้วย
+  - สร้างผู้ใช้ด้วยการเขียน `auth.users` + `auth.identities` ตรง ๆ (ลอกชุดคอลัมน์มาจาก
+    `admin_create_player` ทั้งดุ้น) เพราะไฟล์ seed เป็น SQL ยิงเข้าฐานข้อมูล เรียก Auth API ไม่ได้
+- **`tools/local-env.mjs` + `npm run local:up`** — ไม่จดคีย์ไว้ในเอกสาร แต่ถาม `supabase status -o env`
+  สด ๆ ทุกครั้งแล้วเขียน `.env.local` (Vite อ่านทับ `.env` เสมอ ลบทิ้งเมื่อไหร่ก็กลับไปใช้คลาวด์)
+  คีย์ของสแต็กบนเครื่องเปลี่ยนได้ตามเวอร์ชัน CLI — เอกสารที่จดคีย์ตายตัวจะเก่าเงียบ ๆ จนกว่าจะล็อกอินไม่ผ่าน
+- **เปิดบริการครบทั้งกองตามที่อาจารย์ขอ**: Postgres, Auth (GoTrue), PostgREST, Studio, Storage
+  (+ S3 protocol), Realtime, Edge Functions runtime (Deno 2), Analytics และ Mailpit สำหรับอีเมลทดสอบ
+  — สามอันกลาง (Storage / Realtime / Edge Functions) เกมยังไม่ได้เรียกใช้ แต่สแต็กขึ้นครบและพร้อมใช้
+- `config.toml` ตั้ง `site_url` เป็น `http://localhost:5173` (Vite) เพราะ `authStore.ts` กับ `adminApi.ts`
+  ส่ง `redirectTo: window.location.origin` ไปกับลิงก์รีเซ็ตรหัสผ่าน และ GoTrue ปฏิเสธ redirect นอกลิสต์,
+  `minimum_password_length = 8` ให้ตรงกับ `minLength={8}` ของฟอร์ม, ปิด `enable_confirmations`
+  เพราะเกมล็อกอินต่อทันทีหลัง `signUp()`
+- **[`supabase/README.md`](supabase/README.md)** — คู่มือสำหรับคนที่ไม่เคยเห็นโปรเจกต์นี้มาก่อน:
+  ต้องลงอะไร, สามคำสั่ง, เปิดดูที่ไหนบ้าง (ตารางพอร์ต), บัญชีตัวอย่าง, คำสั่งที่ใช้บ่อย,
+  SQL ที่สวมบทผู้เล่นธรรมดาเพื่อพิสูจน์ว่า RPC แอดมินตอบ 42501 จริง, ตารางแก้ปัญหา
+  และคำเตือนว่า **อย่าสั่ง `db push` ใส่โปรเจกต์คลาวด์** เพราะฝั่งนั้นสร้างด้วยมือ ไม่มีประวัติ migration
+
+**ตรวจอะไรไปแล้วบ้าง** (เครื่องที่ใช้ทำงานนี้ไม่มี Docker และไม่มี WSL จึงยก `supabase start` ไม่ได้):
+
+- `config.toml` — CLI อ่านผ่าน: `supabase status` กับ `supabase migration list` เดินเลยขั้นตอน parse
+  ไปตายที่ "หา docker ไม่เจอ" และพิมพ์พอร์ต `54322` ที่อ่านจากไฟล์ออกมาถูก
+- SQL ทั้ง 16 ไฟล์ (15 migrations + seed) — parse ผ่านด้วย **ไวยากรณ์ PostgreSQL ตัวจริง**
+  (`pg-query-emscripten` คือ parser ของ Postgres คอมไพล์เป็น WASM) ทั้งระดับ statement และระดับ
+  **ตัวฟังก์ชัน plpgsql ข้างใน `$$ ... $$`** ซึ่ง parser ชั้นนอกมองเป็นแค่สตริง — 15 บล็อก plpgsql
+  คอมไพล์ผ่านหมด
+- ลำดับการพึ่งพากันของ migrations — ไล่อ่านเองว่าทุกคอลัมน์/ฟังก์ชันที่ไฟล์หลังอ้างถึง ถูกสร้างในไฟล์ก่อนหน้าแล้ว
+
+**สิ่งที่ยังไม่ได้ทำคือรันจริง**: ไม่มีใคร `supabase db reset` ให้เห็นกับตา การ parse ผ่านบอกได้แค่ว่า
+ไวยากรณ์ถูก ไม่ได้บอกว่า runtime ไม่มีปัญหา — ขั้นแรกบนเครื่องที่มี Docker ควรเป็นคำสั่งนั้น
 
 ### 2026-11-04 — หน้าสอนแต่ละบทมีลิงก์ไปอ่านเนื้อหาเต็มที่ W3Schools
 
