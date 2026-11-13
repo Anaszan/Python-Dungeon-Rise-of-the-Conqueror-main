@@ -12,8 +12,12 @@
 | อย่าง | เวอร์ชัน | วิธีได้มา |
 |---|---|---|
 | Docker Desktop | รุ่นล่าสุด | https://www.docker.com/products/docker-desktop/ (Windows ต้องเปิด WSL 2 backend) |
-| Node.js | 20 ขึ้นไป | https://nodejs.org |
+| Node.js | **20.19 ขึ้นไป หรือ 22.12 ขึ้นไป** | https://nodejs.org (แนะนำ 22 LTS) |
 | Supabase CLI | 3.1.0 | มากับโปรเจกต์แล้ว (`devDependencies`) ไม่ต้องลงเพิ่ม |
+
+> เลข Node มาจาก `engines` ของ Vite 8.1.3 ที่โปรเจกต์ใช้: `^20.19.0 || >=22.12.0`
+> — อ่านว่า "20.19 ขึ้นไปในสาย 20" **หรือ** "22.12 ขึ้นไป" สังเกตว่า **21.x กับ 22.0–22.11
+> ใช้ไม่ได้** เช็กของตัวเองด้วย `node -v`
 
 > **Docker ต้องเปิดอยู่จริง ๆ** ก่อนสั่งคำสั่งในข้อ 2 — เปิดโปรแกรม Docker Desktop
 > แล้วรอจนไอคอนวาฬนิ่ง เช็กได้ด้วย `docker info` ถ้าตอบกลับมาแปลว่าพร้อม
@@ -47,15 +51,24 @@ npm run dev          # เปิดเกมที่ http://localhost:5173
 | บริการ | ที่อยู่ | ใช้ทำอะไร |
 |---|---|---|
 | **Studio** | http://localhost:54323 | หน้าเว็บจัดการทุกอย่าง — ดู/แก้ตาราง รัน SQL ดูผู้ใช้ ดู logs |
-| **API (PostgREST)** | http://localhost:54321 | ปลายทางที่ตัวเกมคุยด้วย |
+| **API Gateway** (Kong) | http://localhost:54321 | ประตูหน้าบ้านที่ตัวเกมคุยด้วย แล้วกระจายต่อไปแต่ละบริการ |
 | **Postgres** | `postgresql://postgres:postgres@localhost:54322/postgres` | ต่อตรงด้วย `psql` / DBeaver / pgAdmin ได้ |
+| **Connection pooler** (Supavisor) | `postgresql://postgres:postgres@localhost:54329/postgres` | ต่อฐานข้อมูลแบบมี pool ให้ |
 | **Mailpit** | http://localhost:54324 | อีเมลทุกฉบับที่ระบบส่ง (ลิงก์รีเซ็ตรหัสผ่าน) มาโผล่ที่นี่ ไม่ได้ออกไปข้างนอกจริง |
-| **Analytics (Logflare)** | http://localhost:54327 | log ของทุกบริการ |
+| **Analytics** (Logflare) | http://localhost:54327 | log ของทุกบริการ |
 
-บริการที่ขึ้นมาด้วยแต่เกมยังไม่ได้เรียกใช้ (เปิดไว้ให้ครบตามโจทย์): **Storage**
-(พร้อม S3 protocol), **Realtime**, และ **Edge Functions runtime** (Deno 2) —
-วางไฟล์ไว้ที่ `supabase/functions/<ชื่อ>/index.ts` แล้ว `supabase functions serve`
-ก็ใช้ได้ทันที
+ที่อยู่เดียวนี้ครอบทุกบริการ — Kong ดูที่ path แล้วส่งต่อให้ตัวที่ถูก:
+
+| path | ไปที่ | เกมใช้ไหม |
+|---|---|---|
+| `/rest/v1` | PostgREST — ตารางและ RPC ทั้งหมด | ✅ ใช้ตลอด |
+| `/auth/v1` | GoTrue — สมัคร/ล็อกอิน/รีเซ็ตรหัสผ่าน | ✅ ใช้ตลอด |
+| `/storage/v1` | Storage (+ S3 protocol) | ยังไม่ได้ใช้ |
+| `/realtime/v1` | Realtime | ยังไม่ได้ใช้ |
+| `/functions/v1` | Edge Functions (Deno 2) | ยังไม่ได้ใช้ |
+
+สามอันล่างขึ้นมาครบและพร้อมใช้ เกมแค่ยังไม่ได้เรียก — Edge Function เพิ่มได้เลยโดย
+วางไฟล์ที่ `supabase/functions/<ชื่อ>/index.ts` แล้ว `supabase functions serve`
 
 ---
 
@@ -160,7 +173,7 @@ JavaScript ในเบราว์เซอร์เองก็ยังเข
 |---|---|
 | `docker: command not found` | ยังไม่ได้ลง Docker Desktop หรือยังไม่ได้เปิด |
 | `failed to inspect container health` | Docker ลงแล้วแต่ยังไม่ได้เปิดโปรแกรม |
-| พอร์ตชนกัน (54321–54327) | มีอะไรใช้พอร์ตอยู่ — ปิดตัวนั้น หรือแก้พอร์ตใน `config.toml` แล้ว `supabase stop` + `start` ใหม่ |
+| พอร์ตชนกัน (54320–54329) | มีอะไรใช้พอร์ตอยู่ — ปิดตัวนั้น หรือแก้พอร์ตใน `config.toml` แล้ว `supabase stop` + `start` ใหม่ |
 | ล็อกอินไม่ผ่านทั้งที่รหัสถูก | `.env.local` ชี้ผิดที่ — รัน `npm run supabase:env` ใหม่ |
 | ลิงก์รีเซ็ตรหัสผ่านไม่เข้าเมล | ถูกแล้ว — อีเมลทุกฉบับไปโผล่ที่ Mailpit http://localhost:54324 |
 | แก้ migration แล้วไม่เห็นผล | `npm run supabase:reset` (CLI รัน migration ที่รันไปแล้วซ้ำให้ไม่ได้) |

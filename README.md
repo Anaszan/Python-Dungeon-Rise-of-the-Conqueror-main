@@ -115,7 +115,7 @@ supabase/                    โปรเจกต์ Supabase CLI — รัน
   README.md                  คู่มือรัน Supabase บนเครื่องตัวเอง: ลงอะไร สั่งอะไร เปิดดูที่ไหน
                              บัญชีตัวอย่าง และวิธีพิสูจน์ว่า RLS/แอดมินกันจริง
   config.toml                ตั้งค่าสแต็ก: พอร์ต, auth (site_url ชี้ที่ Vite 5173), อีเมลทดสอบ,
-                             storage, realtime, edge functions, analytics
+                             storage, realtime, edge functions, analytics, connection pooler
   seed.sql                   บัญชีตัวอย่าง 5 บัญชี (แอดมิน/ผู้เล่นสามระดับ/ผู้ถูกระงับ) + ความคืบหน้า
                              รันอัตโนมัติตอน supabase start และ supabase db reset
   migrations/                สคีมาทั้งหมด เรียงตามลำดับที่ต้องรัน — ไฟล์ชุดเดิม (schema.sql +
@@ -566,9 +566,10 @@ npm run dev          # http://localhost:5173
 - **`tools/local-env.mjs` + `npm run local:up`** — ไม่จดคีย์ไว้ในเอกสาร แต่ถาม `supabase status -o env`
   สด ๆ ทุกครั้งแล้วเขียน `.env.local` (Vite อ่านทับ `.env` เสมอ ลบทิ้งเมื่อไหร่ก็กลับไปใช้คลาวด์)
   คีย์ของสแต็กบนเครื่องเปลี่ยนได้ตามเวอร์ชัน CLI — เอกสารที่จดคีย์ตายตัวจะเก่าเงียบ ๆ จนกว่าจะล็อกอินไม่ผ่าน
-- **เปิดบริการครบทั้งกองตามที่อาจารย์ขอ**: Postgres, Auth (GoTrue), PostgREST, Studio, Storage
-  (+ S3 protocol), Realtime, Edge Functions runtime (Deno 2), Analytics และ Mailpit สำหรับอีเมลทดสอบ
-  — สามอันกลาง (Storage / Realtime / Edge Functions) เกมยังไม่ได้เรียกใช้ แต่สแต็กขึ้นครบและพร้อมใช้
+- **เปิดบริการครบทั้งกองตามที่อาจารย์ขอ**: Postgres, API Gateway (Kong), Auth (GoTrue), PostgREST,
+  Studio, Storage (+ S3 protocol), Realtime, Edge Functions runtime (Deno 2), Analytics (Logflare),
+  Mailpit สำหรับอีเมลทดสอบ และ **connection pooler (Supavisor)** ซึ่ง CLI ปิดไว้เป็นค่าเริ่มต้น
+  — เกมยังไม่ได้เรียกใช้ Storage / Realtime / Edge Functions / pooler แต่สแต็กขึ้นครบและพร้อมใช้
 - `config.toml` ตั้ง `site_url` เป็น `http://localhost:5173` (Vite) เพราะ `authStore.ts` กับ `adminApi.ts`
   ส่ง `redirectTo: window.location.origin` ไปกับลิงก์รีเซ็ตรหัสผ่าน และ GoTrue ปฏิเสธ redirect นอกลิสต์,
   `minimum_password_length = 8` ให้ตรงกับ `minLength={8}` ของฟอร์ม, ปิด `enable_confirmations`

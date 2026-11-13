@@ -11,7 +11,9 @@
 project_id = "python-dungeon"
 
 # ---------------------------------------------------------------------------
-# API (PostgREST) — ปลายทางที่ src/lib/supabase.ts เรียก
+# API Gateway (Kong) — ปลายทางเดียวที่ src/lib/supabase.ts เรียก
+# ประตูหน้าบ้านของทุกบริการ: /rest/v1 → PostgREST, /auth/v1 → GoTrue,
+# /storage/v1 → Storage, /realtime/v1 → Realtime, /functions/v1 → Edge Functions
 # ---------------------------------------------------------------------------
 [api]
 enabled = true
@@ -30,12 +32,22 @@ shadow_port = 54320
 # เช็กฝั่งคลาวด์ด้วย `SHOW server_version;`
 major_version = 17
 
+# Connection pooler (Supavisor) — ค่าเริ่มต้นของ CLI คือปิด เปิดไว้ให้สแต็กขึ้นครบ
+# ทุกบริการตามโจทย์ ตัวเกมต่อผ่าน API Gateway อยู่แล้วจึงไม่ได้ใช้พอร์ตนี้ แต่ถ้าจะ
+# ต่อตรงเข้าฐานข้อมูลแบบที่มีการ pool ให้ (เช่นจาก serverless) ก็ใช้ 54329 ได้
+[db.pooler]
+enabled = true
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
 [db.migrations]
 enabled = true
 
 [db.seed]
 # เปิดไว้: `supabase start` และ `supabase db reset` จะใส่บัญชีตัวอย่างให้เลย
-# (แอดมิน 1 + ผู้เล่น 3) ไม่ต้องมานั่งสมัครก่อนถึงจะเห็นกระดานอันดับมีข้อมูล
+# (แอดมิน 1 + ผู้เล่น 4) ไม่ต้องมานั่งสมัครก่อนถึงจะเห็นกระดานอันดับมีข้อมูล
 enabled = true
 sql_paths = ["./seed.sql"]
 
