@@ -1,13 +1,20 @@
--- ข้อมูลตัวอย่างสำหรับเครื่องตัวเองเท่านั้น
+-- ข้อมูลตัวอย่าง — ไฟล์เดียวกันนี้ใช้ได้ทั้งเครื่องตัวเองและโปรเจกต์บนคลาวด์
 --
--- `supabase start` และ `supabase db reset` จะรันไฟล์นี้ต่อท้าย migrations
--- ทั้งหมด (ดู [db.seed] ใน config.toml) เพื่อให้เปิดเกมปุ๊บมีของให้ดูเลย —
--- กระดานอันดับไม่ว่างเปล่า แผงแอดมินมีผู้เล่นให้กดดู และมีบัญชีที่ถูกระงับไว้
--- ให้ลองหน้าจอ "บัญชีถูกระงับ" โดยไม่ต้องไประงับใครเอง
+-- บนเครื่อง: `supabase start` / `supabase db reset` รันให้อัตโนมัติต่อท้าย
+-- migrations ทั้งหมด (ดู [db.seed] ใน config.toml)
+-- บนคลาวด์: เอาไฟล์นี้ไปวางใน SQL Editor แล้วกดรัน (ดู supabase/README.md ข้อ 9)
 --
--- !!! ห้ามรันไฟล์นี้กับโปรเจกต์บนคลาวด์ !!!
--- รหัสผ่านข้างล่างอยู่ในกิตเพื่อให้อาจารย์เปิดดูได้ทันที ซึ่งแปลว่าใคร ๆ ก็รู้
--- มันเป็นบัญชีของฐานข้อมูลที่เกิดและตายไปพร้อมกับ `supabase stop` เท่านั้น
+-- ผลคือเปิดเกมปุ๊บมีของให้ดูเลย — กระดานอันดับไม่ว่างเปล่า แผงแอดมินมีผู้เล่นให้กดดู
+-- และมีบัญชีที่ถูกระงับไว้ให้ลองหน้าจอ "บัญชีถูกระงับ" โดยไม่ต้องไประงับใครเอง
+--
+-- **รันซ้ำได้ และไม่ลบอะไรทิ้ง** ทุกขั้นตอนข้างล่างเช็กก่อนว่ามีอยู่แล้วหรือยัง
+-- บัญชีที่มีอยู่แล้วจะถูกอัปเดตให้ตรงกับไฟล์นี้ ไม่ใช่สร้างซ้ำ — รันกี่รอบผลก็
+-- ลงเอยเหมือนกัน และ **ผู้ใช้จริงที่มีอยู่ก่อนไม่ถูกแตะต้องเลย**
+--
+-- ข้อควรรู้ก่อนรันบนคลาวด์: รหัสผ่านข้างล่างอยู่ในกิต แปลว่าใคร ๆ ก็รู้ ถ้าเอา
+-- ขึ้นโปรเจกต์จริงก็เท่ากับเปิดบัญชีแอดมินที่ทุกคนรู้รหัสไว้บนอินเทอร์เน็ต
+-- ตั้งใจให้เป็นแบบนั้นเฉพาะตอนส่งงาน/สาธิต พอตรวจเสร็จควรลบทิ้งด้วย
+--   delete from auth.users where email like '%@local.test';
 --
 -- ทำไมต้องเขียน auth.users เอง: การสร้างผู้ใช้อย่างถูกวิธีต้องยิง Auth API ด้วย
 -- service_role key ซึ่งไฟล์ seed ทำไม่ได้ (มันเป็น SQL ที่รันตรงเข้าฐานข้อมูล)
@@ -17,6 +24,9 @@
 
 -- ---------------------------------------------------------------------------
 -- ตัวช่วยสร้างบัญชี — ลบทิ้งท้ายไฟล์ ไม่หลงเหลือไปอยู่ในฐานข้อมูลจริง
+--
+-- ถ้าอีเมลนี้มีอยู่แล้วจะคืน id เดิมโดยไม่แตะอะไร (ยกเว้นรหัสผ่านกับชื่อที่ตั้งให้
+-- ตรงกับไฟล์นี้) — นี่คือสิ่งที่ทำให้รันซ้ำได้และทำให้สองฝั่งลงเอยเหมือนกัน
 -- ---------------------------------------------------------------------------
 create or replace function pg_temp.seed_player(
   p_email text,
@@ -30,7 +40,32 @@ language plpgsql
 as $$
 declare
   v_id uuid := gen_random_uuid();
+  v_existing uuid;
 begin
+  select id into v_existing from auth.users where lower(email) = lower(p_email);
+
+  -- มีอยู่แล้ว: ดันค่าให้ตรงกับไฟล์นี้แล้วจบ ไม่สร้างใหม่
+  -- (ตั้งรหัสผ่านทับด้วย เพราะ "ข้อมูลเหมือนกันสองฝั่ง" ต้องรวมถึงรหัสผ่านที่ใช้
+  --  ล็อกอินได้จริง ไม่งั้นบัญชีเดียวกันสองฝั่งเข้าได้ไม่เหมือนกัน)
+  if v_existing is not null then
+    update auth.users
+    set encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')),
+        email_confirmed_at = coalesce(email_confirmed_at, now()),
+        raw_user_meta_data = jsonb_build_object('nickname', p_nickname, 'phone', p_phone),
+        updated_at = now()
+    where id = v_existing;
+
+    update public.profiles
+    set display_name = p_display_name, nickname = p_nickname
+    where id = v_existing;
+
+    insert into public.user_contacts (id, phone)
+    values (v_existing, p_phone)
+    on conflict (id) do update set phone = excluded.phone;
+
+    return v_existing;
+  end if;
+
   insert into auth.users (
     id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
@@ -130,10 +165,31 @@ begin
 
     (v_banned,    'Grimm',   'wizard',  'male',   '#e8b98a', '#b8262c', 'easy', 2, 200, 15,
       '{slime-1,slime-2,wraith-1,wraith-2,wraith-3,goblin-1,goblin-2,goblin-3,dragon-1}',
-      '{heal-1,attack-1}', now() - interval '5 days');
+      '{heal-1,attack-1}', now() - interval '5 days')
+  -- รันซ้ำแล้วดันค่าให้ตรงกับไฟล์นี้ ไม่ใช่ระเบิดที่ primary key
+  -- ซึ่งแปลว่า "รันไฟล์นี้ทั้งสองฝั่ง" = "ข้อมูลตัวอย่างสองฝั่งเหมือนกัน" เสมอ
+  on conflict (user_id) do update set
+    character_name = excluded.character_name,
+    character_class = excluded.character_class,
+    gender = excluded.gender,
+    skin_color = excluded.skin_color,
+    shirt_color = excluded.shirt_color,
+    difficulty = excluded.difficulty,
+    current_level = excluded.current_level,
+    player_hp = excluded.player_hp,
+    attack_power = excluded.attack_power,
+    defeated_monster_ids = excluded.defeated_monster_ids,
+    collected_pickup_ids = excluded.collected_pickup_ids,
+    updated_at = excluded.updated_at;
 
   -- ผู้พิชิต: มีแถวใน scores ถึงจะขึ้นหัวตารางในฐานะคนที่จบเกมแล้ว
   -- (ดูลำดับการเรียงใน get_progress_leaderboard — migration 007)
+  --
+  -- scores ไม่มีคีย์ธรรมชาติ (id เป็น uuid สุ่ม) เลยใช้ on conflict ไม่ได้ —
+  -- ลบของเดิมของบัญชีตัวอย่างคนนี้ทิ้งก่อนแล้วใส่ใหม่ ถึงจะรันซ้ำได้โดยไม่สะสม
+  -- แถวซ้ำ แตะเฉพาะ v_conqueror ซึ่งเป็นบัญชีที่ไฟล์นี้สร้างเอง ไม่โดนคนอื่น
+  delete from public.scores where user_id = v_conqueror;
+
   insert into public.scores (user_id, monsters_defeated, completed_at)
   values (v_conqueror, 58, now() - interval '3 days');
 

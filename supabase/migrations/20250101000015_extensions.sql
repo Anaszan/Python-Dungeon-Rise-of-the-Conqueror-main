@@ -1,18 +1,26 @@
--- Runs before everything else. Nothing in the game calls these directly; they
--- are what the later migrations assume is already there.
+-- ไฟล์เดียวในชุดนี้ที่โปรเจกต์บนคลาวด์ยังไม่เคยรัน — และเป็นเหตุผลที่มันอยู่
+-- ท้ายสุดแทนที่จะอยู่หัวแถว
 --
--- On a hosted Supabase project this file is a no-op: the platform creates the
--- `extensions` schema and installs pgcrypto into it before you ever see the
--- project, which is why migrations_014 could write `extensions.crypt(...)` in
--- admin_create_player without ever asking for the extension. A local stack
--- from `supabase start` is built from the same image and so has it too — but
--- "the base image happens to ship it" is not something a migration should
--- rest on when saying so costs two statements and both are idempotent.
+-- 001–014 ถูกเอาไปวางใน SQL Editor ของโปรเจกต์คลาวด์ด้วยมือไปแล้วทั้งหมด
+-- วิธีทำให้สองฝั่งเหมือนกันโดยไม่ต้องรันของเก่าซ้ำ (ซึ่งอันตรายกับฐานข้อมูลที่มี
+-- ผู้ใช้จริงอยู่) คือบอก CLI ว่า 001–014 "ขึ้นไปแล้ว" แล้ว push เฉพาะไฟล์ใหม่
+-- ไฟล์ใหม่จึงต้องมีเลขมากกว่า 014 ไม่งั้น CLI จะเจอ migration ที่ยังไม่รันโผล่
+-- อยู่ "ก่อน" ตัวที่รันไปแล้ว ซึ่งมันปฏิเสธ (ดู supabase/README.md ข้อ 9)
 --
--- pgcrypto is the one that matters: crypt() / gen_salt('bf') are how
--- admin_create_player hashes the password for an account the admin creates by
--- hand, and a missing extension there fails at the moment an admin tries to
--- add a player, not at setup time where it would be obvious.
+-- การย้ายมาไว้ท้ายแถวไม่กระทบอะไร: migration 014 เขียน `extensions.crypt(...)`
+-- ไว้ "ข้างใน body ของฟังก์ชัน" admin_create_player ซึ่ง Postgres ไม่ได้ resolve
+-- ตอน create function แต่ resolve ตอนเรียกใช้จริง — ส่วนขยายจึงแค่ต้องมีอยู่ก่อน
+-- "แอดมินกดเพิ่มผู้ใช้" ไม่ใช่ก่อน "สร้างฟังก์ชัน"
+--
+-- บนคลาวด์ไฟล์นี้เป็น no-op อยู่แล้ว: แพลตฟอร์มสร้าง schema extensions และลง
+-- pgcrypto ให้ตั้งแต่ก่อนเราเห็นโปรเจกต์ ซึ่งเป็นเหตุผลที่ 014 เขียน
+-- extensions.crypt() ได้โดยไม่ต้องขอ และอิมเมจของ CLI ก็มีให้เหมือนกัน
+-- แต่ "อิมเมจบังเอิญมีมาให้" ไม่ใช่สิ่งที่ migration ควรฝากชีวิตไว้ ในเมื่อการพูดออกมา
+-- ตรง ๆ ราคาแค่สองบรรทัดและทั้งคู่รันซ้ำได้
+--
+-- pgcrypto คือตัวที่สำคัญ: crypt() / gen_salt('bf') คือวิธีที่ admin_create_player
+-- แฮชรหัสผ่านของบัญชีที่แอดมินสร้างเอง ถ้าส่วนขยายหาย มันจะพังตอนแอดมินกดเพิ่มผู้ใช้
+-- ไม่ใช่ตอนติดตั้งที่จะเห็นได้ชัดกว่ากันมาก
 
 create schema if not exists extensions;
 

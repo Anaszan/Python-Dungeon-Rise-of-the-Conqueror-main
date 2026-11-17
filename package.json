@@ -14,6 +14,7 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset",
+    "supabase:diff": "supabase db diff --linked --schema public",
     "supabase:env": "node tools/local-env.mjs",
     "local:up": "npm run supabase:start && npm run supabase:env"
   },
